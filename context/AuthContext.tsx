@@ -28,6 +28,24 @@ function ssClear() {
   } catch {}
 }
 
+// ─── Session flag cookie (for Next.js middleware) ─────────────────────────────
+// The refreshToken httpOnly cookie is set by the backend (onrender.com) and is
+// invisible to middleware running on the frontend domain (vercel.app) because
+// cookies are domain-scoped. We set a lightweight non-sensitive flag cookie on
+// the FRONTEND domain so the middleware can detect an active session.
+
+function sessionCookieSet() {
+  if (typeof document === "undefined") return
+  const maxAge = 7 * 24 * 60 * 60 // 7 days in seconds
+  const secure = location.protocol === "https:" ? "; Secure" : ""
+  document.cookie = `ft_session=1; path=/; max-age=${maxAge}; SameSite=Lax${secure}`
+}
+
+function sessionCookieClear() {
+  if (typeof document === "undefined") return
+  document.cookie = "ft_session=; path=/; max-age=0; SameSite=Lax"
+}
+
 /**
  * Parse a JWT payload (no signature verification – backend handles that).
  * Returns { token, user } if the token is present and not yet expired,
@@ -108,14 +126,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accessTokenRef.current = token
     setAccessToken(token)
     setUser(userData)
-    ssSet(token, userData) // persist across page reloads
+    ssSet(token, userData)   // persist across page reloads
+    sessionCookieSet()       // signal to Next.js middleware that session is active
   }, [])
 
   const clearTokens = useCallback(() => {
     accessTokenRef.current = null
     setAccessToken(null)
     setUser(null)
-    ssClear() // evict from sessionStorage
+    ssClear()                // evict from sessionStorage
+    sessionCookieClear()     // remove session flag so middleware redirects to login
   }, [])
 
   const getToken = useCallback((): string | null => {
