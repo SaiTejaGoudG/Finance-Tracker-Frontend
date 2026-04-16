@@ -1,15 +1,12 @@
 /**
- * Next.js middleware for route protection.
+ * Next.js proxy (formerly middleware) for route protection.
  *
  * How it works:
  * - On hard navigations (full page load / direct URL), checks for the
- *   `refreshToken` cookie. If absent → redirect to /login.
+ *   `ft_session` cookie set by AuthContext. If absent → redirect to /login.
  * - On client-side navigation (router.push/replace), Next.js sends an RSC
  *   fetch with the `RSC` header. We pass these through so post-login
  *   redirects work. The AuthProvider handles auth for client-side nav.
- *
- * NOTE: The refreshToken cookie MUST have path: '/' (set in the backend) so
- * the browser includes it on requests to all routes, not just /api/auth/*.
  */
 
 import { NextResponse } from "next/server"
@@ -23,7 +20,7 @@ const PUBLIC_PATHS = ["/login", "/signup"]
 // because it is domain-scoped to onrender.com and invisible to vercel.app.
 const SESSION_FLAG_COOKIE = "ft_session"
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // ── 1. Always allow public paths ──────────────────────────────────────────
