@@ -59,7 +59,7 @@ interface UserProfile {
 
 function ConfigurationsPageContent() {
   const { toast } = useToast()
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const [creditCards, setCreditCards] = useState<TransformedCreditCard[]>([])
   const [showAddCard, setShowAddCard] = useState(false)
   const [editingCard, setEditingCard] = useState<CreditCardType | null>(null)
@@ -92,9 +92,31 @@ function ConfigurationsPageContent() {
     dateFormat: user?.date_format ?? "DD-MM-YYYY",
   })
 
+  // Sync profile fields once the user object is available from AuthContext.
+  // Initial useState uses user?.name etc. but user is null on first render
+  // (auth is still bootstrapping), so the fields would stay empty without this.
   useEffect(() => {
-    fetchCreditCards()
-  }, [])
+    if (user) {
+      setProfile({
+        name: user.name ?? "",
+        email: user.email ?? "",
+        phone: user.phone ?? "",
+        currency: user.currency ?? "INR",
+        timezone: user.timezone ?? "Asia/Kolkata",
+        dateFormat: user.date_format ?? "DD-MM-YYYY",
+      })
+    }
+  }, [user])
+
+  // Wait for AuthContext to finish bootstrapping (restoring token from
+  // sessionStorage) before making API calls. Child component effects fire
+  // before parent effects, so without this guard the token would be null
+  // on the first call → 401 Unauthorized.
+  useEffect(() => {
+    if (!authLoading) {
+      fetchCreditCards()
+    }
+  }, [authLoading])
 
   const fetchCreditCards = async () => {
     setIsLoading(true)
@@ -319,11 +341,11 @@ function ConfigurationsPageContent() {
         <h1 className="text-2xl font-bold">Configurations</h1>
       </div>
 
-      <Tabs defaultValue="credit-cards" className="w-full">
+      <Tabs defaultValue="profile" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="credit-cards">Credit Cards</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="credit-cards">Credit Cards</TabsTrigger>
         </TabsList>
 
         <TabsContent value="credit-cards" className="space-y-4">
