@@ -184,12 +184,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return promise
   }, [clearTokens, setTokens])
 
+  // forceLogout: called by apiClient when a mid-session refresh fails.
+  // Uses a ref-based redirect so it's stable and doesn't need router in scope.
+  const forceLogout = useCallback(() => {
+    clearTokens()
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.replace("/login")
+    }
+  }, [clearTokens])
+
   // Register token handlers SYNCHRONOUSLY in the render body (not useEffect).
   // React runs child effects BEFORE parent effects, so if this were a useEffect,
   // child components (e.g. Dashboard) would fire their fetch before _getToken is
   // registered → 401 on every first request. Calling it here runs before any
   // child effect executes. getToken and refreshAccessToken are stable references.
-  registerAuthHandlers(getToken, refreshAccessToken)
+  registerAuthHandlers(getToken, refreshAccessToken, forceLogout)
 
   // ─── Bootstrap: try silent refresh on mount ──────────────────────────────────
 

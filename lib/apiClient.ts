@@ -17,6 +17,7 @@ import { apiUrl } from "@/lib/api"
 // writes to once it mounts.
 let _getToken: (() => string | null) | null = null
 let _refreshToken: (() => Promise<string | null>) | null = null
+let _forceLogout: (() => void) | null = null
 
 /**
  * Called by AuthProvider on mount to register the token accessors.
@@ -25,9 +26,11 @@ let _refreshToken: (() => Promise<string | null>) | null = null
 export function registerAuthHandlers(
   getToken: () => string | null,
   refreshToken: () => Promise<string | null>,
+  forceLogout: () => void,
 ) {
   _getToken = getToken
   _refreshToken = refreshToken
+  _forceLogout = forceLogout
 }
 
 // ─── Core fetch wrapper ───────────────────────────────────────────────────────
@@ -57,8 +60,30 @@ export async function apiClient(url: string, options: RequestInit = {}): Promise
     if (newToken) {
       // Retry original request with the new token
       res = await doFetch(url, options)
+    } else {
+      // Refresh failed (e.g. "Refresh token is required" / cookie expired).
+      // Clear session and send user back to login.
+      _forceLogout?.()
     }
-    // If refresh failed, the AuthProvider will redirect to /login
+    return res
+  }
+
+  // Also catch explicit session-expired payloads that come back as 200
+  // e.g. { "status": "error", "message": "Refresh token is required" }
+  if (res.status === 200) {
+    const cloned = res.clone()
+    try {
+      const body = await cloned.json()
+      if (
+        body?.status === "error" &&
+        typeof body?.message === "string" &&
+        body.message.toLowerCase().includes("refresh token")
+      ) {
+        _forceLogout?.()
+      }
+    } catch {
+      // not JSON or not a session error — ignore
+    }
   }
 
   return res

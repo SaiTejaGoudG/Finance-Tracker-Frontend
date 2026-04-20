@@ -23,7 +23,7 @@ import GoalsTab from "@/components/goals-tab"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreditCard, Target } from "lucide-react"
 import TransactionTabs from "./transaction-tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 
 // API Response Types for Dashboard API ONLY
 export type ApiTransaction = {
@@ -650,19 +650,20 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <MonthCalendar onMonthSelect={handleMonthSelect} defaultMonth={selectedMonthDate} />
           {/* Removed duplicate month/year badge */}
-          <Select value={selectedOwnerType || "all"} onValueChange={handleOwnerTypeChange}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Owner" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Owners</SelectItem>
-              {ownerTypes.map((ownerType) => (
-                <SelectItem key={ownerType} value={ownerType}>
-                  {ownerType.charAt(0).toUpperCase() + ownerType.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={selectedOwnerType || "all"}
+            onValueChange={handleOwnerTypeChange}
+            placeholder="Owner"
+            searchPlaceholder="Search owner…"
+            className="w-36"
+            options={[
+              { value: "all", label: "All Owners" },
+              ...ownerTypes.map((o) => ({
+                value: o,
+                label: o.charAt(0).toUpperCase() + o.slice(1),
+              })),
+            ]}
+          />
           {usingFallback && (
             <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200">
               ⚠️ Using demo data

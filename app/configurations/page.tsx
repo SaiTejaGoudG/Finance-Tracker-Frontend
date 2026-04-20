@@ -3,7 +3,7 @@
 import { apiUrl } from "@/lib/api"
 import { apiClient } from "@/lib/apiClient"
 import { useAuth } from "@/context/AuthContext"
-import { Select, SelectTrigger, SelectContent, SelectValue, SelectItem } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -606,54 +606,48 @@ function ConfigurationsPageContent() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
-                  <Select
+                  <Label>Currency</Label>
+                  <SearchableSelect
                     value={profile.currency}
                     onValueChange={(value) => setProfile({ ...profile, currency: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="INR">Indian Rupee (₹)</SelectItem>
-                      <SelectItem value="USD">US Dollar ($)</SelectItem>
-                      <SelectItem value="EUR">Euro (€)</SelectItem>
-                      <SelectItem value="GBP">British Pound (£)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select currency"
+                    searchPlaceholder="Search currency…"
+                    options={[
+                      { value: "INR", label: "Indian Rupee (₹)" },
+                      { value: "USD", label: "US Dollar ($)" },
+                      { value: "EUR", label: "Euro (€)" },
+                      { value: "GBP", label: "British Pound (£)" },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Select
+                  <Label>Timezone</Label>
+                  <SearchableSelect
                     value={profile.timezone}
                     onValueChange={(value) => setProfile({ ...profile, timezone: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Asia/Kolkata">Asia/Kolkata (IST)</SelectItem>
-                      <SelectItem value="America/New_York">America/New_York (EST)</SelectItem>
-                      <SelectItem value="Europe/London">Europe/London (GMT)</SelectItem>
-                      <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select timezone"
+                    searchPlaceholder="Search timezone…"
+                    options={[
+                      { value: "Asia/Kolkata",      label: "Asia/Kolkata (IST)" },
+                      { value: "America/New_York",  label: "America/New_York (EST)" },
+                      { value: "Europe/London",     label: "Europe/London (GMT)" },
+                      { value: "Asia/Tokyo",        label: "Asia/Tokyo (JST)" },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="dateFormat">Date Format</Label>
-                  <Select
+                  <Label>Date Format</Label>
+                  <SearchableSelect
                     value={profile.dateFormat}
                     onValueChange={(value) => setProfile({ ...profile, dateFormat: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DD-MM-YYYY">DD-MM-YYYY</SelectItem>
-                      <SelectItem value="MM-DD-YYYY">MM-DD-YYYY</SelectItem>
-                      <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select format"
+                    searchPlaceholder="Search format…"
+                    options={[
+                      { value: "DD-MM-YYYY", label: "DD-MM-YYYY" },
+                      { value: "MM-DD-YYYY", label: "MM-DD-YYYY" },
+                      { value: "YYYY-MM-DD", label: "YYYY-MM-DD" },
+                    ]}
+                  />
                 </div>
               </div>
               <div className="flex justify-end">

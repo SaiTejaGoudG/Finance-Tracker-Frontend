@@ -7,9 +7,9 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -260,26 +260,27 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
 
         {/* ── Row 1: Transaction Type + Credit Card (or empty) ────────── */}
         <div className="space-y-1.5">
-          <Label htmlFor="type">Transaction Type</Label>
-          <Select value={type} onValueChange={handleTypeChange}>
-            <SelectTrigger id="type">
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="income">Income</SelectItem>
-              <SelectItem value="expense">Expense</SelectItem>
-              <SelectItem value="credit">Credit Card</SelectItem>
-              <SelectItem value="petty-cash">Petty Cash</SelectItem>
-              <SelectItem value="investment">Investment</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label>Transaction Type</Label>
+          <SearchableSelect
+            value={type}
+            onValueChange={handleTypeChange}
+            placeholder="Select type"
+            searchPlaceholder="Search type…"
+            options={[
+              { value: "income",     label: "Income" },
+              { value: "expense",    label: "Expense" },
+              { value: "credit",     label: "Credit Card" },
+              { value: "petty-cash", label: "Petty Cash" },
+              { value: "investment", label: "Investment" },
+            ]}
+          />
         </div>
 
         {/* Credit Card selector appears right next to type when relevant */}
         {showCardSelect && (
           <div className="space-y-1.5">
-            <Label htmlFor="card">Credit Card</Label>
-            <Select
+            <Label>Credit Card</Label>
+            <SearchableSelect
               value={selectedCardId || ""}
               onValueChange={(value) => {
                 setSelectedCardId(value)
@@ -287,28 +288,14 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
                 setSelectedCardName(found?.card_name || "")
               }}
               disabled={cardsLoading}
-            >
-              <SelectTrigger id="card">
-                <SelectValue placeholder={cardsLoading ? "Loading cards..." : "Select credit card"}>
-                  {selectedCardId ? (
-                    <span className="inline-flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      {cards.find((c) => String(c.id) === selectedCardId)?.card_name || selectedCardName || "Card"}
-                    </span>
-                  ) : undefined}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {cards.map((card) => (
-                  <SelectItem key={card.id} value={String(card.id)}>
-                    <span className="inline-flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      {card.card_name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder={cardsLoading ? "Loading cards…" : "Select credit card"}
+              searchPlaceholder="Search card…"
+              options={cards.map((card) => ({
+                value: String(card.id),
+                label: card.card_name,
+                icon: <CreditCard className="h-4 w-4 text-muted-foreground" />,
+              }))}
+            />
           </div>
         )}
 
@@ -341,45 +328,28 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="category">Category</Label>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger id="category">
-              <SelectValue placeholder="Select category">
-                {category && (() => {
-                  const { emoji, color } = getCategoryMeta(category)
-                  return (
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="flex items-center justify-center w-6 h-6 rounded-md text-sm select-none"
-                        style={{ backgroundColor: color }}
-                      >
-                        {emoji}
-                      </span>
-                      {category}
-                    </span>
-                  )
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((c) => {
-                const { emoji, color } = getCategoryMeta(c)
-                return (
-                  <SelectItem key={c} value={c}>
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="flex items-center justify-center w-6 h-6 rounded-md text-sm select-none"
-                        style={{ backgroundColor: color }}
-                      >
-                        {emoji}
-                      </span>
-                      {c}
-                    </span>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
+          <Label>Category</Label>
+          <SearchableSelect
+            value={category}
+            onValueChange={setCategory}
+            placeholder="Select category"
+            searchPlaceholder="Search category…"
+            options={categories.map((c) => {
+              const { emoji, color } = getCategoryMeta(c)
+              return {
+                value: c,
+                label: c,
+                icon: (
+                  <span
+                    className="flex items-center justify-center w-6 h-6 rounded-md text-sm select-none shrink-0"
+                    style={{ backgroundColor: color }}
+                  >
+                    {emoji}
+                  </span>
+                ),
+              }
+            })}
+          />
         </div>
 
         {/* ── Row 4: Transaction Date + Due Date / Status ─────────────── */}
@@ -443,83 +413,67 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
         {/* Status sits beside Transaction Date for non-expense types */}
         {showStatusField && !showDueDateField && (
           <div className="space-y-1.5">
-            <Label htmlFor="status">Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as StatusType)}>
-              <SelectTrigger id="status">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Paid">Paid</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Status</Label>
+            <SearchableSelect
+              value={status}
+              onValueChange={(v) => setStatus(v as StatusType)}
+              placeholder="Select status"
+              searchPlaceholder="Search status…"
+              options={[
+                { value: "Pending", label: "Pending" },
+                { value: "Paid",    label: "Paid" },
+              ]}
+            />
           </div>
         )}
 
         {/* ── Row 5: Status + Owner Type (for Expense which has Due Date above) */}
         {showStatusField && showDueDateField && (
           <div className="space-y-1.5">
-            <Label htmlFor="status">Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as StatusType)}>
-              <SelectTrigger id="status">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Paid">Paid</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Status</Label>
+            <SearchableSelect
+              value={status}
+              onValueChange={(v) => setStatus(v as StatusType)}
+              placeholder="Select status"
+              searchPlaceholder="Search status…"
+              options={[
+                { value: "Pending", label: "Pending" },
+                { value: "Paid",    label: "Paid" },
+              ]}
+            />
           </div>
         )}
 
         {/* ── Row 5/6: Owner Type + Expense Type ──────────────────────── */}
         <div className="space-y-1.5">
-          <Label htmlFor="ownerType">Owner Type</Label>
-          <Select value={ownerType} onValueChange={setOwnerType}>
-            <SelectTrigger id="ownerType">
-              <SelectValue placeholder="Select owner">
-                <span className="inline-flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  {ownerType.charAt(0).toUpperCase() + ownerType.slice(1)}
-                </span>
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {OWNER_TYPES.map((o) => (
-                <SelectItem key={o} value={o}>
-                  <span className="inline-flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    {o.charAt(0).toUpperCase() + o.slice(1)}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Owner Type</Label>
+          <SearchableSelect
+            value={ownerType}
+            onValueChange={setOwnerType}
+            placeholder="Select owner"
+            searchPlaceholder="Search owner…"
+            options={OWNER_TYPES.map((o) => ({
+              value: o,
+              label: o.charAt(0).toUpperCase() + o.slice(1),
+              icon: <User className="h-4 w-4 text-muted-foreground" />,
+            }))}
+          />
         </div>
 
         {showExpenseTypeField && (
           <div className="space-y-1.5">
-            <Label htmlFor="expenseType">Expense Type</Label>
-            <Select value={expenseType} onValueChange={(v) => setExpenseType(v as "fixed" | "variable")}>
-              <SelectTrigger id="expenseType">
-                <SelectValue placeholder="Select type">
-                  <span className="inline-flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-muted-foreground" />
-                    {expenseType.charAt(0).toUpperCase() + expenseType.slice(1)}
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {EXPENSE_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    <span className="inline-flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-muted-foreground" />
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Expense Type</Label>
+            <SearchableSelect
+              value={expenseType}
+              onValueChange={(v) => setExpenseType(v as "fixed" | "variable")}
+              placeholder="Select type"
+              searchPlaceholder="Search type…"
+              options={EXPENSE_TYPES.map((t) => ({
+                value: t,
+                label: t.charAt(0).toUpperCase() + t.slice(1),
+                icon: <Layers className="h-4 w-4 text-muted-foreground" />,
+              }))}
+            />
           </div>
         )}
       </div>

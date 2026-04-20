@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import StatusBadge from "@/components/status-badge"
@@ -135,57 +135,47 @@ export default function TransactionTabs(props: Props) {
 
       {/* Category filter */}
       <div className="w-full sm:w-48">
-        <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categoryOptions.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={selectedCategory}
+          onValueChange={handleCategoryChange}
+          placeholder="Filter by category"
+          searchPlaceholder="Search category…"
+          options={categoryOptions.map((cat) => ({ value: cat, label: cat }))}
+        />
       </div>
 
       {/* Expense Type filter: only for All Transactions and Expenses tabs */}
       {["all-transactions", "expenses"].includes(activeTab) && (
         <div className="w-full sm:w-48">
-          <Select value={selectedExpenseType} onValueChange={setSelectedExpenseType}>
-            <SelectTrigger>
-              <SelectValue placeholder="Expense Type" />
-            </SelectTrigger>
-            <SelectContent>
-              {expenseTypeOptions.map((opt) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt === "All" ? "All Types" : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={selectedExpenseType}
+            onValueChange={setSelectedExpenseType}
+            placeholder="Expense Type"
+            searchPlaceholder="Search type…"
+            options={expenseTypeOptions.map((opt) => ({
+              value: opt,
+              label: opt === "All" ? "All Types" : opt.charAt(0).toUpperCase() + opt.slice(1),
+            }))}
+          />
         </div>
       )}
 
       {/* Credit card filter when in credit-cards tab and cards available */}
       {activeTab === "credit-cards" && Array.isArray(cardsWithTransactions) && cardsWithTransactions.length > 0 && (
         <div className="w-full sm:w-56">
-          <Select
+          <SearchableSelect
             value={selectedCard || "all"}
             onValueChange={(value) => setSelectedCard(value === "all" ? null : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by card" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Cards</SelectItem>
-              {cardsWithTransactions.map((c: any) => (
-                <SelectItem key={c.card_id} value={c.card_name}>
-                  {c.card_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder="Filter by card"
+            searchPlaceholder="Search card…"
+            options={[
+              { value: "all", label: "All Cards" },
+              ...cardsWithTransactions.map((c: any) => ({
+                value: c.card_name,
+                label: c.card_name,
+              })),
+            ]}
+          />
         </div>
       )}
     </div>

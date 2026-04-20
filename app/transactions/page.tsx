@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import StatusBadge from "@/components/status-badge"
@@ -645,40 +645,30 @@ function TransactionsPageContent() {
                 </div>
 
                 <div className="w-full sm:w-48">
-                  <Select value={selectedCategory} onValueChange={handleCategoryFilter} disabled={loading}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableCategories().map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={selectedCategory}
+                    onValueChange={handleCategoryFilter}
+                    disabled={loading}
+                    placeholder="Filter by category"
+                    searchPlaceholder="Search category…"
+                    options={getAvailableCategories().map((cat) => ({ value: cat, label: cat }))}
+                  />
                 </div>
 
                 {/* Credit Card Filter */}
                 {activeTab === "credit-cards" && creditCards.length > 0 && (
                   <div className="w-full sm:w-48">
-                    <Select
+                    <SearchableSelect
                       value={selectedCard || "all"}
                       onValueChange={(value) => setSelectedCard(value === "all" ? null : value)}
                       disabled={loading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by card" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Cards</SelectItem>
-                        {creditCards.map((card) => (
-                          <SelectItem key={card} value={card}>
-                            {card}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Filter by card"
+                      searchPlaceholder="Search card…"
+                      options={[
+                        { value: "all", label: "All Cards" },
+                        ...creditCards.map((card) => ({ value: card, label: card })),
+                      ]}
+                    />
                   </div>
                 )}
               </div>
