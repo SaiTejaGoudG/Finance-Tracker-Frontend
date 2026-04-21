@@ -273,7 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { accessToken: token, user: userData } = data.data
       setTokens(token, userData)
-      router.replace("/")
+      router.replace("/dashboard")
     },
     [setTokens, router],
   )
@@ -299,7 +299,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { accessToken: token, user: userData } = data.data
       setTokens(token, userData)
-      router.replace("/")
+      router.replace("/dashboard")
     },
     [setTokens, router],
   )

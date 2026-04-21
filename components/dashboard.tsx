@@ -7,6 +7,8 @@ import { ArrowUp, ArrowDown, TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import ExpenseDistribution from "@/components/expense-distribution"
+import IncomeDistribution from "@/components/income-distribution"
+import PettyCashChart, { type PettyCashTrendItem } from "@/components/petty-cash-chart"
 import MonthCalendar from "@/components/month-calendar"
 import { format, subMonths } from "date-fns"
 import TransactionViewDialog from "@/components/transaction-view-dialog"
@@ -20,6 +22,7 @@ import { useToast } from "@/components/ui/use-toast"
 import LoansTab from "@/components/loans-tab"
 import SavingsTab from "@/components/savings-tab"
 import GoalsTab from "@/components/goals-tab"
+import FreelancingAnalytics from "@/components/freelancing-analytics"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreditCard, Target } from "lucide-react"
 import TransactionTabs from "./transaction-tabs"
@@ -65,13 +68,15 @@ export type DashboardApiResponse = {
       Income: ApiTransaction[]
       Investment: ApiTransaction[]
       Expense: ApiTransaction[]
-      "Credit Card": CreditCardData[] // Changed from CreditCardTransaction[]
+      "Credit Card": CreditCardData[]
       "Petty Cash": ApiTransaction[]
       "All Transactions": ApiTransaction[]
     }
     financialSummary: FinancialSummary
     expenseDistribution: ExpenseDistributionItem[]
+    incomeDistribution: ExpenseDistributionItem[]
     monthlyTrend: MonthlyTrendItem[]
+    pettyCashTrends: PettyCashTrendItem[]
   }
 }
 
@@ -280,7 +285,7 @@ export default function Dashboard() {
   const [selectedOwnerType, setSelectedOwnerType] = useState<string>("")
 
   // Main tabs
-  const [mainTab, setMainTab] = useState<"overview" | "loans" | "savings" | "goals">("overview")
+  const [mainTab, setMainTab] = useState<"overview" | "analytics" | "loans" | "savings" | "goals">("overview")
 
   // Transactions section state
   const [activeTab, setActiveTab] = useState<
@@ -640,7 +645,13 @@ export default function Dashboard() {
     )
   }
 
-  const { financialSummary, expenseDistribution, monthlyTrend } = dashboardData
+  const {
+    financialSummary,
+    expenseDistribution,
+    incomeDistribution = [],
+    monthlyTrend,
+    pettyCashTrends = [],
+  } = dashboardData
   const selectedMonthDate = new Date(currentYear, currentMonth - 1, 1)
 
   return (
@@ -806,14 +817,21 @@ export default function Dashboard() {
       </div>
 
       {/* Main Tab Navigation */}
-      <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-muted p-1 rounded-lg">
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as typeof mainTab)} className="w-full">
+        <TabsList className="grid w-full grid-cols-5 bg-muted p-1 rounded-lg">
           <TabsTrigger
             value="overview"
             className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
             <TrendingUp className="h-4 w-4" />
             Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="analytics"
+            className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            <LucideIcons.BarChart2 className="h-4 w-4" />
+            Analytics
           </TabsTrigger>
           <TabsTrigger
             value="loans"
@@ -839,7 +857,7 @@ export default function Dashboard() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
-          {/* Charts */}
+          {/* Row 1: Monthly trend + Expense Distribution */}
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
@@ -853,6 +871,12 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             <ExpenseDistribution expenseDistribution={expenseDistribution} />
+          </div>
+
+          {/* Row 2: Income Distribution + Petty Cash Trends */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <IncomeDistribution incomeDistribution={incomeDistribution} />
+            <PettyCashChart pettyCashTrends={pettyCashTrends} />
           </div>
 
           {/* Transaction Tabs */}
@@ -876,6 +900,19 @@ export default function Dashboard() {
             handleEditTransaction={handleEditTransaction}
             handleDeleteTransaction={handleDeleteTransaction}
           />
+        </TabsContent>
+
+        {/* ── Analytics Tab ──────────────────────────────────────────── */}
+        <TabsContent value="analytics" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Analytics</h2>
+              <p className="text-sm text-muted-foreground">Deep-dive into your income streams and spending patterns</p>
+            </div>
+          </div>
+          {/* Freelancing card — spans full width on its own */}
+          <FreelancingAnalytics ownerType={selectedOwnerType || undefined} />
+          {/* More analytics cards will be added here */}
         </TabsContent>
 
         <TabsContent value="loans" className="mt-6">

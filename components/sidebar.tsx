@@ -8,13 +8,18 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Menu, LayoutDashboard, CreditCard, Settings, LogOut } from "lucide-react"
+import { Menu, LayoutDashboard, CreditCard, Settings, LogOut, BarChart2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 
 const sidebarItems = [
   {
     title: "Dashboard",
-    href: "/",
+    href: "/dashboard",
+    icon: BarChart2,
+  },
+  {
+    title: "Overview",
+    href: "/overview",
     icon: LayoutDashboard,
   },
   {
