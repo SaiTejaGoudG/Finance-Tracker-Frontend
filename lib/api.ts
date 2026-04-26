@@ -9,8 +9,8 @@
  */
 export const BASE_URL =
   // process.env.NEXT_PUBLIC_API_URL ||
-  "https://finance-tracker-backend-kuh4.onrender.com/api";
-  // "http://localhost:9000/api";
+  // "https://finance-tracker-backend-kuh4.onrender.com/api";
+  "http://localhost:9000/api";
 
 /**
  * Build a full API URL from a relative path.

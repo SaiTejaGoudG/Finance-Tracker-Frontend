@@ -32,6 +32,27 @@ export type DistributionData = { type: string; total: number; data: Distribution
 export type PettyCashMonth = { month: string; year: string; label: string; amount: number }
 export type PettyCashData  = { data: PettyCashMonth[]; total: number; dateRange: DateRange }
 
+export type CreditCardItem = {
+  card_id: string
+  card_name: string
+  total: number
+  transaction_count: number
+  percentage: number
+}
+export type CreditCardMonthBucket = {
+  label: string
+  total: number
+  [cardId: string]: number | string
+}
+export type CreditCardData = {
+  total: number
+  cards: CreditCardItem[]
+  cardIds: string[]
+  cardNames: Record<string, string>
+  monthlyData: CreditCardMonthBucket[]
+  dateRange: DateRange
+}
+
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
 export type OverviewFilters = {
@@ -85,7 +106,7 @@ function useAsyncFetch<T>(
   return state
 }
 
-// ─── Main hook — all 4 endpoints ─────────────────────────────────────────────
+// ─── Main hook — all 5 endpoints ─────────────────────────────────────────────
 
 export function useOverviewData(filters: OverviewFilters) {
   const deps = [filters.startDate, filters.endDate, filters.ownerType]
@@ -95,6 +116,7 @@ export function useOverviewData(filters: OverviewFilters) {
   const expDist  = useAsyncFetch<DistributionData>(() => fetchApi("analytics/distribution", filters, { type: "expense" }), deps)
   const incDist  = useAsyncFetch<DistributionData>(() => fetchApi("analytics/distribution", filters, { type: "income" }), deps)
   const petty    = useAsyncFetch<PettyCashData>(() => fetchApi("analytics/petty-cash", filters), deps)
+  const ccAnalytics = useAsyncFetch<CreditCardData>(() => fetchApi("analytics/credit-cards", filters), deps)
 
-  return { summary, trends, expDist, incDist, petty }
+  return { summary, trends, expDist, incDist, petty, ccAnalytics }
 }
