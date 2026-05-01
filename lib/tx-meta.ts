@@ -27,7 +27,9 @@ const CATEGORY_META: Record<string, CategoryMeta> = {
   "Personal Care":        { emoji: "✂️", color: "#fb7185" }, // rose-400
   Gardening:              { emoji: "🌿", color: "#22c55e" }, // green-500
   Gifts:                  { emoji: "🎁", color: "#f87171" }, // red-400
+  Grocery:                { emoji: "🛒", color: "#16a34a" }, // green-600
   Party:                  { emoji: "🎉", color: "#d946ef" }, // fuchsia-500
+  Watch:                  { emoji: "⌚", color: "#374151" }, // gray-700
 
   // ── Expense — transport & vehicles ────────────────────────────────────────
   Transport:              { emoji: "🚇", color: "#a855f7" }, // purple-500

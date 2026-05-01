@@ -836,15 +836,17 @@ function TransactionsPageContent() {
 
       {/* Transaction Form Dialog */}
       <Dialog open={showTransactionForm} onOpenChange={setShowTransactionForm}>
-        <DialogContent className="sm:max-w-[540px] max-h-[85vh] overflow-y-auto p-4">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[540px] flex flex-col max-h-[90vh] p-0">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
             <DialogTitle>{editingTransaction ? "Edit Transaction" : "Add New Transaction"}</DialogTitle>
           </DialogHeader>
+          <div className="overflow-y-auto flex-1 px-5 py-4">
           <TransactionForm
             onSubmit={handleTransactionFormSubmit}
             onCancel={handleTransactionFormCancel}
             editTransaction={editingTransaction}
           />
+          </div>
         </DialogContent>
       </Dialog>
 

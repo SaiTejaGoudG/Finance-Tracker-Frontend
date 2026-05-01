@@ -14,6 +14,7 @@ import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee } from "lucide
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { getCategoryMeta } from "@/lib/tx-meta"
+import { incomeCategories, expenseCategories, investmentCategories } from "@/lib/data"
 
 type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment"
 type StatusType = "Pending" | "Paid"
@@ -42,36 +43,9 @@ type Props = {
 type CreditCardItem = { id: number; card_name: string }
 
 // Category sets
-const INCOME_CATEGORIES = ["Freelancing", "Interest", "Others", "Salary"]
-const EXPENSE_CATEGORIES = [
-  "Bike Fuel",
-  "Bike Service",
-  "Car Accessories",
-  "Car Fuel",
-  "Car Service",
-  "Chitti",
-  "Credit Card Payment",
-  "Debt",
-  "Education",
-  "Electronics",
-  "EMI",
-  "Entertainment",
-  "Food",
-  "Freelancing",
-  "Gadgets",
-  "Gardening",
-  "Gifts",
-  "Healthcare",
-  "Housing",
-  "Other Expenses",
-  "Party",
-  "Personal Care",
-  "Shopping",
-  "Transport",
-  "Travel",
-  "Utilities",
-]
-const INVESTMENT_CATEGORIES = ["Chitti", "SIP"]
+const INCOME_CATEGORIES     = [...incomeCategories].sort()
+const EXPENSE_CATEGORIES    = [...expenseCategories].sort()
+const INVESTMENT_CATEGORIES = [...investmentCategories].sort()
 
 const OWNER_TYPES = ["self", "brother", "friend", "other"]
 const EXPENSE_TYPES: Array<"fixed" | "variable"> = ["fixed", "variable"]

@@ -90,16 +90,20 @@ export function SearchableSelect({
         className={cn("p-0 w-[var(--radix-popover-trigger-width)]", contentClassName)}
         align="start"
         sideOffset={4}
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} autoFocus />
-          <CommandList>
+          <CommandList
+            className="max-h-60 overflow-y-scroll overscroll-contain"
+            onWheel={(e) => e.stopPropagation()}
+          >
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((opt) => (
                 <CommandItem
                   key={opt.value}
-                  // cmdk matches against `value` prop — use label so search works on visible text
                   value={opt.label}
                   onSelect={() => {
                     onValueChange(opt.value)

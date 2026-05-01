@@ -36,6 +36,7 @@ export const expenseCategories = [
   "Gadgets",
   "Gardening",
   "Gifts",
+  "Grocery",
   "Healthcare",
   "Housing",
   "Other Expenses",
@@ -45,6 +46,7 @@ export const expenseCategories = [
   "Transport",
   "Travel",
   "Utilities",
+  "Watch",
 ]
 
 // Credit categories (for credit card transactions)
