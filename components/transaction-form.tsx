@@ -84,13 +84,13 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
     }
   }, [type])
 
-  const showExpenseType = type === "expense" || type === "credit" || type === "petty-cash"
+  const showExpenseType = type === "expense" || type === "credit"
   const showDueDate = type === "expense" // Removed Credit Card from showing due date
   const showCardSelect = type === "credit"
   const showStatus = type !== "credit" && type !== "petty-cash"
 
   // Flags to completely hide fields from UI based on transaction type
-  const showExpenseTypeField = type === "expense" || type === "credit" || type === "petty-cash"
+  const showExpenseTypeField = type === "expense" || type === "credit"
   const showDueDateField = type === "expense" // Removed Credit Card from showing due date
   const showStatusField = type !== "credit" && type !== "petty-cash"
 
@@ -132,6 +132,20 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
       fetchCards()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type])
+
+  // Auto-set due date to match transaction date for new expense transactions
+  useEffect(() => {
+    if (type === "expense" && !editTransaction) {
+      setDueDate(date)
+    }
+  }, [date, type])
+
+  // Clear due date when switching away from expense type to avoid stale values
+  useEffect(() => {
+    if (type !== "expense") {
+      setDueDate(undefined)
+    }
   }, [type])
 
   const handleTypeChange = (val: string) => {

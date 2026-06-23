@@ -74,12 +74,16 @@ export async function apiClient(url: string, options: RequestInit = {}): Promise
     const cloned = res.clone()
     try {
       const body = await cloned.json()
-      if (
-        body?.status === "error" &&
-        typeof body?.message === "string" &&
-        body.message.toLowerCase().includes("refresh token")
-      ) {
-        _forceLogout?.()
+      if (body?.status === "error" && typeof body?.message === "string") {
+        const msg = body.message.toLowerCase().trim()
+        const isSessionExpired =
+          msg === "refresh token is required" ||
+          msg === "refresh token expired" ||
+          msg === "invalid refresh token" ||
+          msg === "jwt expired"
+        if (isSessionExpired) {
+          _forceLogout?.()
+        }
       }
     } catch {
       // not JSON or not a session error — ignore

@@ -30,6 +30,10 @@ const CATEGORY_META: Record<string, CategoryMeta> = {
   Grocery:                { emoji: "🛒", color: "#16a34a" }, // green-600
   Party:                  { emoji: "🎉", color: "#d946ef" }, // fuchsia-500
   Watch:                  { emoji: "⌚", color: "#374151" }, // gray-700
+  Desktop:              { emoji: "🖥️", color: "#1d4ed8" }, // blue-700
+  Dining:               { emoji: "🍽️", color: "#b45309" }, // amber-700
+  "Snacks & Beverages": { emoji: "🧃", color: "#65a30d" }, // lime-600
+  "Street Food":        { emoji: "🌮", color: "#ea580c" }, // orange-600
 
   // ── Expense — transport & vehicles ────────────────────────────────────────
   Transport:              { emoji: "🚇", color: "#a855f7" }, // purple-500

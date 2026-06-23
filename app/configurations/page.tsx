@@ -196,15 +196,24 @@ function ConfigurationsPageContent() {
     }
   }
 
-  const handleEditCard = (card: CreditCardType) => {
-    console.log("[v0] Edit card clicked:", card)
-    setEditingCard(card)
+  const handleEditCard = (card: TransformedCreditCard) => {
+    // CreditCardsTable passes TransformedCreditCard (camelCase); map back to snake_case for editingCard
+    const raw: CreditCardType = {
+      id:                 Number(card.id),
+      card_name:          card.cardName,
+      card_number:        card.cardNumber,
+      card_limit:         card.cardLimit,
+      billing_cycle_date: card.billingCycleDate,
+      due_days:           card.paymentDueDays,
+      created_at:         card.createdAt,
+    }
+    setEditingCard(raw)
     setNewCard({
-      card_name: card.card_name || "",
-      card_number: card.card_number || "",
-      card_limit: card.card_limit ? card.card_limit.toString() : "",
-      billing_cycle_date: card.billing_cycle_date ? card.billing_cycle_date.toString() : "",
-      due_days: card.due_days ? card.due_days.toString() : "",
+      card_name:          raw.card_name           || "",
+      card_number:        raw.card_number         || "",
+      card_limit:         raw.card_limit          ? raw.card_limit.toString()         : "",
+      billing_cycle_date: raw.billing_cycle_date  ? raw.billing_cycle_date.toString() : "",
+      due_days:           raw.due_days            ? raw.due_days.toString()           : "",
     })
     setShowAddCard(true)
   }

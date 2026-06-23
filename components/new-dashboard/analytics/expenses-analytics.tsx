@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from "recharts"
 import { ShoppingBag } from "lucide-react"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
@@ -41,6 +41,46 @@ export default function ExpensesAnalytics({ filters }: { filters: OverviewFilter
           </div>
         ))}
       </div>
+
+      {/* Fixed vs Variable summary */}
+      {(data.totalFixed > 0 || data.totalVariable > 0) && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Fixed Expenses</p>
+            <p className="text-xl font-bold tabular-nums mt-1 text-blue-600">{fmtINR(data.totalFixed)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {data.total > 0 ? ((data.totalFixed / data.total) * 100).toFixed(1) : 0}% of total
+            </p>
+          </div>
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Variable Expenses</p>
+            <p className="text-xl font-bold tabular-nums mt-1 text-amber-600">{fmtINR(data.totalVariable)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {data.total > 0 ? ((data.totalVariable / data.total) * 100).toFixed(1) : 0}% of total
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Fixed vs Variable monthly bar chart */}
+      {data.fixedVsVariable && data.fixedVsVariable.some((m: any) => m.fixed > 0 || m.variable > 0) && (
+        <div className="rounded-2xl border bg-card shadow-sm p-5">
+          <h3 className="text-sm font-semibold mb-3">Fixed vs Variable — Monthly Comparison</h3>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.fixedVsVariable} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap="30%">
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
+                <Tooltip formatter={(v: any, name: string) => [fmtINR(v), name === "fixed" ? "Fixed" : "Variable"]} />
+                <Legend formatter={(v: string) => v === "fixed" ? "Fixed" : "Variable"} />
+                <Bar dataKey="fixed"    fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="variable" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Monthly trend */}

@@ -254,6 +254,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ─── Proactive token refresh ──────────────────────────────────────────────────
+  // Schedule a silent refresh 1 minute before the access token expires.
+  // This keeps the session alive during inactive periods as long as the
+  // httpOnly refresh-token cookie is still valid (7 days).
+  useEffect(() => {
+    if (!accessToken) return
+
+    let timerId: ReturnType<typeof setTimeout> | null = null
+
+    try {
+      const b64     = accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")
+      const payload = JSON.parse(atob(b64)) as { exp?: number }
+      const expiresAt = (payload.exp ?? 0) * 1000
+      // Refresh 1 minute before expiry (minimum 5 seconds to avoid tight loops)
+      const delay = Math.max(5_000, expiresAt - Date.now() - 60_000)
+      timerId = setTimeout(() => {
+        refreshAccessToken()
+      }, delay)
+    } catch {
+      // Malformed token – don't crash, let normal 401 handling take over
+    }
+
+    return () => {
+      if (timerId) clearTimeout(timerId)
+    }
+  }, [accessToken, refreshAccessToken])
+
   // ─── Auth actions ────────────────────────────────────────────────────────────
 
   const login = useCallback(
