@@ -14,9 +14,9 @@ import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee } from "lucide
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { getCategoryMeta } from "@/lib/tx-meta"
-import { incomeCategories, expenseCategories, investmentCategories } from "@/lib/data"
+import { incomeCategories, expenseCategories, investmentCategories, assetCategories } from "@/lib/data"
 
-type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment"
+type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "asset"
 type StatusType = "Pending" | "Paid"
 
 type EditTransaction = {
@@ -46,6 +46,7 @@ type CreditCardItem = { id: number; card_name: string }
 const INCOME_CATEGORIES     = [...incomeCategories].sort()
 const EXPENSE_CATEGORIES    = [...expenseCategories].sort()
 const INVESTMENT_CATEGORIES = [...investmentCategories].sort()
+const ASSET_CATEGORIES      = [...assetCategories].sort()
 
 const OWNER_TYPES = ["self", "brother", "friend", "other"]
 const EXPENSE_TYPES: Array<"fixed" | "variable"> = ["fixed", "variable"]
@@ -75,24 +76,22 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   // Derived
   const categories = useMemo(() => {
     switch (type) {
-      case "income":
-        return INCOME_CATEGORIES
-      case "investment":
-        return INVESTMENT_CATEGORIES
-      default:
-        return EXPENSE_CATEGORIES
+      case "income":      return INCOME_CATEGORIES
+      case "investment":  return INVESTMENT_CATEGORIES
+      case "asset":       return ASSET_CATEGORIES
+      default:            return EXPENSE_CATEGORIES
     }
   }, [type])
 
-  const showExpenseType = type === "expense" || type === "credit"
-  const showDueDate = type === "expense" // Removed Credit Card from showing due date
-  const showCardSelect = type === "credit"
-  const showStatus = type !== "credit" && type !== "petty-cash"
+  const showExpenseType      = type === "expense" || type === "credit"
+  const showDueDate          = type === "expense"
+  const showCardSelect       = type === "credit"
+  const showStatus           = type !== "credit" && type !== "petty-cash" && type !== "asset"
 
   // Flags to completely hide fields from UI based on transaction type
   const showExpenseTypeField = type === "expense" || type === "credit"
-  const showDueDateField = type === "expense" // Removed Credit Card from showing due date
-  const showStatusField = type !== "credit" && type !== "petty-cash"
+  const showDueDateField     = type === "expense"
+  const showStatusField      = type !== "credit" && type !== "petty-cash" && type !== "asset"
 
   // Fetch credit cards from API using exact shape: data.data.data[]
   const fetchCards = async () => {
@@ -158,26 +157,22 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   }
 
   const computeExpenseType = (): "fixed" | "variable" | null => {
-    if (type === "expense") return expenseType
-    if (type === "credit") return "variable"
+    if (type === "expense")    return expenseType
+    if (type === "credit")     return "variable"
     if (type === "petty-cash") return "fixed"
-    if (type === "income") return category === "Salary" ? "fixed" : "variable"
+    if (type === "income")     return category === "Salary" ? "fixed" : "variable"
     if (type === "investment") return "variable"
-    return null
+    return null  // asset: no expense_type
   }
 
   const toApiType = (t: TxType) => {
     switch (t) {
-      case "credit":
-        return "Credit Card"
-      case "petty-cash":
-        return "Petty Cash"
-      case "investment":
-        return "Investment"
-      case "income":
-        return "Income"
-      default:
-        return "Expense"
+      case "credit":     return "Credit Card"
+      case "petty-cash": return "Petty Cash"
+      case "investment": return "Investment"
+      case "income":     return "Income"
+      case "asset":      return "Asset"
+      default:           return "Expense"
     }
   }
 
@@ -199,7 +194,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
     }
 
     const getDueDate = () => {
-      if (type === "income" || type === "investment" || type === "petty-cash") {
+      if (type === "income" || type === "investment" || type === "petty-cash" || type === "asset") {
         return null
       }
       if (type === "expense" && dueDate) {
@@ -260,6 +255,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
               { value: "credit",     label: "Credit Card" },
               { value: "petty-cash", label: "Petty Cash" },
               { value: "investment", label: "Investment" },
+              { value: "asset",      label: "Asset Purchase" },
             ]}
           />
         </div>

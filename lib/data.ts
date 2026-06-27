@@ -73,6 +73,16 @@ export const creditCategories = [
 // Investment categories
 export const investmentCategories = ["Chitti", "SIP"]
 
+// Asset categories (physical assets — land, gold, property, vehicles)
+export const assetCategories = [
+  "Equipment",
+  "Land",
+  "Other Asset",
+  "Physical Gold",
+  "Property / Flat",
+  "Vehicle",
+]
+
 // Generate sample transactions
 export const generateSampleTransactions = (): Transaction[] => {
   return [

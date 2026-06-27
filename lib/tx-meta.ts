@@ -65,6 +65,14 @@ const CATEGORY_META: Record<string, CategoryMeta> = {
 
   // ── Investment ────────────────────────────────────────────────────────────
   SIP:                    { emoji: "📈", color: "#3b82f6" }, // blue-500
+
+  // ── Asset (physical) ─────────────────────────────────────────────────────
+  Land:                   { emoji: "🏞️", color: "#15803d" }, // green-700
+  "Property / Flat":      { emoji: "🏠", color: "#0369a1" }, // sky-700
+  "Physical Gold":        { emoji: "🥇", color: "#d97706" }, // amber-600
+  Vehicle:                { emoji: "🚗", color: "#6d28d9" }, // violet-700
+  Equipment:              { emoji: "⚙️", color: "#475569" }, // slate-600
+  "Other Asset":          { emoji: "💎", color: "#be185d" }, // pink-700
 }
 
 const DEFAULT_META: CategoryMeta = { emoji: "💰", color: "#9ca3af" } // gray-400

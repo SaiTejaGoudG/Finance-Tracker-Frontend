@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Loader2, BarChart3, TrendingUp, PiggyBank, Target, Landmark, Wallet, Download, Sparkles, Coins, Users, Tag } from "lucide-react"
+import { Loader2, BarChart3, TrendingUp, PiggyBank, Target, Landmark, Wallet, Download, Sparkles, Coins, Users, Tag, Building2 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import LayoutWrapper           from "@/components/layout-wrapper"
@@ -27,6 +27,7 @@ import PettyCashAnalytics      from "@/components/new-dashboard/analytics/petty-
 import OwnerComparison         from "@/components/new-dashboard/analytics/owner-comparison"
 import CategoryTrends          from "@/components/new-dashboard/analytics/category-trends"
 import LoansTab                from "@/components/loans-tab"
+import AssetsTab               from "@/components/assets-tab"
 import SavingsTab              from "@/components/savings-tab"
 import GoalsTab                from "@/components/goals-tab"
 
@@ -89,7 +90,7 @@ function DashboardContent() {
 
       {/* ── Tabs ────────────────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-5">
-        <TabsList className="grid w-full grid-cols-7 h-10 rounded-xl border bg-muted/40 p-1">
+        <TabsList className="grid w-full grid-cols-8 h-10 rounded-xl border bg-muted/40 p-1">
           <TabsTrigger value="overview"     className="rounded-lg text-xs font-medium gap-1.5 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
             <BarChart3 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
@@ -101,6 +102,9 @@ function DashboardContent() {
           </TabsTrigger>
           <TabsTrigger value="loans"        className="rounded-lg text-xs font-medium gap-1.5 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
             <Landmark className="h-3.5 w-3.5" /><span className="hidden sm:inline">Loans</span>
+          </TabsTrigger>
+          <TabsTrigger value="assets"       className="rounded-lg text-xs font-medium gap-1.5 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
+            <Building2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Assets</span>
           </TabsTrigger>
           <TabsTrigger value="savings"      className="rounded-lg text-xs font-medium gap-1.5 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-white dark:data-[state=active]:text-black">
             <PiggyBank className="h-3.5 w-3.5" /><span className="hidden sm:inline">Savings</span>
@@ -192,6 +196,11 @@ function DashboardContent() {
         {/* ── Loans ─────────────────────────────────────────────────────────── */}
         <TabsContent value="loans" className="mt-0">
           <LoansTab />
+        </TabsContent>
+
+        {/* ── Assets ────────────────────────────────────────────────────────── */}
+        <TabsContent value="assets" className="mt-0">
+          <AssetsTab />
         </TabsContent>
 
         {/* ── Savings ───────────────────────────────────────────────────────── */}
