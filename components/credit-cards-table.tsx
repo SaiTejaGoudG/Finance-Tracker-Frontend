@@ -65,7 +65,7 @@ export default function CreditCardsTable({ creditCards, onEdit, onDelete }: Cred
           </TableRow>
         </TableHeader>
         <TableBody>
-          {creditCards.map((card) => {
+          {[...creditCards].sort((a, b) => a.billingCycleDate - b.billingCycleDate).map((card) => {
             const last4Digits = card.cardNumber.slice(-4)
 
             return (
