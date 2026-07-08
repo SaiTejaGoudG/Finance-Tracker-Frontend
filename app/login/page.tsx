@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,8 @@ import AuthIllustration from "@/components/auth-illustration"
 import { useAuth } from "@/context/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 
-export default function LoginPage() {
+// Wrap in a named inner component so useSearchParams() is inside <Suspense>
+function LoginContent() {
   const { login, signup } = useAuth()
   const { toast } = useToast()
   const searchParams = useSearchParams()
@@ -289,5 +290,14 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Next.js App Router requires useSearchParams() to be inside a <Suspense> boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   )
 }
