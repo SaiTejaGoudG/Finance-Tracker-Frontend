@@ -23,6 +23,8 @@ import LayoutWrapper from "@/components/layout-wrapper"
 import { expenseCategories, incomeCategories, investmentCategories } from "@/components/dashboard"
 import * as LucideIcons from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import RecurringManageModal from "@/components/recurring-manage-modal"
+import RecurringGenerateModal from "@/components/recurring-generate-modal"
 
 // API Response Types for Transactions Listing
 type ApiTransaction = {
@@ -36,6 +38,8 @@ type ApiTransaction = {
   amount: number
   card_id: number | null
   card_name: string | null
+  owner_type?: string | null
+  expense_type?: string | null
 }
 
 type TransactionsListingResponse = {
@@ -65,8 +69,21 @@ export type Transaction = {
   dueDate?: string
   status?: "Pending" | "Paid"
   cardName?: string
+  ownerType?: string | null
+  expenseType?: "fixed" | "variable" | null
   isSummary?: boolean
   summaryType?: "credit" | "petty-cash" | "investment"
+}
+
+// Map API transaction_type string → frontend TxType
+const apiTypeToTxType = (apiType: string): Transaction["type"] => {
+  switch (apiType) {
+    case "Credit Card":  return "credit"
+    case "Petty Cash":   return "petty-cash"
+    case "Income":       return "income"
+    case "Investment":   return "investment"
+    default:             return "expense"
+  }
 }
 
 // Convert API transaction to legacy format
@@ -81,12 +98,14 @@ const convertApiTransactionToLegacy = (apiTransaction: ApiTransaction): Transact
     id: apiTransaction.id.toString(),
     description: apiTransaction.description,
     amount: apiTransaction.amount,
-    type: apiTransaction.transaction_type.toLowerCase().replace(" ", "-") as Transaction["type"],
+    type: apiTypeToTxType(apiTransaction.transaction_type),
     category: apiTransaction.category,
     date: convertDateFormat(apiTransaction.transaction_date),
     dueDate: apiTransaction.due_date ? convertDateFormat(apiTransaction.due_date) : undefined,
     status: apiTransaction.status,
     cardName: apiTransaction.card_name || undefined,
+    ownerType: apiTransaction.owner_type ?? "self",
+    expenseType: (apiTransaction.expense_type as "fixed" | "variable" | null) ?? null,
   }
 }
 
@@ -116,6 +135,10 @@ function TransactionsPageContent() {
   const [sortBy, setSortBy] = useState<"date" | "amount">("date")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [totalAmount, setTotalAmount] = useState<number>(0)
+
+  // Recurring modals
+  const [showRecurringManage, setShowRecurringManage] = useState(false)
+  const [showRecurringGenerate, setShowRecurringGenerate] = useState(false)
 
   // Use ref to prevent duplicate API calls
   const isFetchingRef = useRef(false)
@@ -506,12 +529,42 @@ function TransactionsPageContent() {
     }
   }
 
+  const refreshTransactions = () => {
+    const transactionType = getTransactionTypeForTab(activeTab)
+    const month = selectedMonth.getMonth() + 1
+    const year  = selectedMonth.getFullYear()
+    const cardId = activeTab === "credit-cards" && selectedCard && selectedCard !== "all"
+      ? getCardIdFromName(selectedCard) : ""
+    fetchTransactions(transactionType, month, year, selectedCategory, cardId)
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* Recurring modals */}
+      <RecurringManageModal
+        open={showRecurringManage}
+        onClose={() => setShowRecurringManage(false)}
+      />
+      <RecurringGenerateModal
+        open={showRecurringGenerate}
+        onClose={() => setShowRecurringGenerate(false)}
+        month={selectedMonth.getMonth() + 1}
+        year={selectedMonth.getFullYear()}
+        onGenerated={refreshTransactions}
+      />
+
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold">All Transactions</h1>
           <MonthCalendar onMonthSelect={handleMonthSelect} defaultMonth={selectedMonth} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowRecurringManage(true)}>
+            <LucideIcons.Repeat className="h-4 w-4 mr-2" /> Manage Recurring
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowRecurringGenerate(true)}>
+            <LucideIcons.Zap className="h-4 w-4 mr-2" /> Generate Recurring
+          </Button>
         </div>
       </div>
 
