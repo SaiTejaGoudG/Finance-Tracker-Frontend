@@ -81,19 +81,28 @@ export default function ExpenseDistribution({ expenseDistribution }: ExpenseDist
                 aria-label="Expense distribution pie chart"
               >
                 <title>Expense Distribution</title>
-                {slices.map((slice, idx) => (
-                  <path
-                    key={slice.category + idx}
-                    d={describeArc(110, 110, 100, slice.startAngle, slice.endAngle)}
-                    fill={slice.color}
-                    stroke="hsl(var(--background))"
-                    strokeWidth="1"
-                  >
+                {slices.length === 1 ? (
+                  /* Single category = 100%: arc path degenerates, use a full circle instead */
+                  <circle cx="110" cy="110" r="100" fill={slices[0].color}>
                     <title>
-                      {slice.category}: ₹{slice.amount.toLocaleString("en-IN")} ({slice.percentage.toFixed(1)}%)
+                      {slices[0].category}: ₹{slices[0].amount.toLocaleString("en-IN")} (100%)
                     </title>
-                  </path>
-                ))}
+                  </circle>
+                ) : (
+                  slices.map((slice, idx) => (
+                    <path
+                      key={slice.category + idx}
+                      d={describeArc(110, 110, 100, slice.startAngle, slice.endAngle)}
+                      fill={slice.color}
+                      stroke="hsl(var(--background))"
+                      strokeWidth="1"
+                    >
+                      <title>
+                        {slice.category}: ₹{slice.amount.toLocaleString("en-IN")} ({slice.percentage.toFixed(1)}%)
+                      </title>
+                    </path>
+                  ))
+                )}
                 {/* Donut hole */}
                 <circle cx="110" cy="110" r="55" fill="hsl(var(--background))" />
                 <text x="110" y="102" textAnchor="middle" style={{ fill: "hsl(var(--foreground))" }} fontSize="12">

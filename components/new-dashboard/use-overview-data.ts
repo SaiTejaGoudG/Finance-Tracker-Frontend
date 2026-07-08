@@ -38,6 +38,7 @@ export type CreditCardItem = {
   total: number
   transaction_count: number
   percentage: number
+  last_transaction_date: string | null
 }
 export type CreditCardMonthBucket = {
   label: string

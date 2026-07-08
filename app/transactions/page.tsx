@@ -423,8 +423,33 @@ function TransactionsPageContent() {
     }
   }
 
-  const handleDeleteTransaction = (id: string) => {
-    console.log("Delete transaction:", id)
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      const response = await apiClient(apiUrl(`transaction/delete/${id}`), {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({}))
+        throw new Error((json as any).message || "Delete failed")
+      }
+
+      toast({
+        title: "Transaction deleted",
+        description: "The transaction has been permanently removed.",
+        variant: "default",
+      })
+
+      // Refresh the list
+      refreshTransactions()
+    } catch (error) {
+      console.error("Error deleting transaction:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete transaction.",
+        variant: "destructive",
+      })
+    }
   }
 
   const toggleSort = (column: "date" | "amount") => {
@@ -859,7 +884,7 @@ function TransactionsPageContent() {
                               onView={handleViewTransaction}
                               onEdit={handleEditTransaction}
                               onDelete={handleDeleteTransaction}
-                              showEditOption={true}
+                              showEditOption={!transaction.id.startsWith("emi_")}
                             />
                           </TableCell>
                         </TableRow>

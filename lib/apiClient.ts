@@ -26,7 +26,7 @@ let _forceLogout: (() => void) | null = null
 export function registerAuthHandlers(
   getToken: () => string | null,
   refreshToken: () => Promise<string | null>,
-  forceLogout: () => void,
+  forceLogout: (reason?: string) => void,
 ) {
   _getToken = getToken
   _refreshToken = refreshToken
@@ -63,7 +63,7 @@ export async function apiClient(url: string, options: RequestInit = {}): Promise
     } else {
       // Refresh failed (e.g. "Refresh token is required" / cookie expired).
       // Clear session and send user back to login.
-      _forceLogout?.()
+      _forceLogout?.("session_expired")
     }
     return res
   }

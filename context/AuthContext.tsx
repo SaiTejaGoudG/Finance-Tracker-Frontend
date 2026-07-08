@@ -184,12 +184,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return promise
   }, [clearTokens, setTokens])
 
-  // forceLogout: called by apiClient when a mid-session refresh fails.
-  // Uses a ref-based redirect so it's stable and doesn't need router in scope.
-  const forceLogout = useCallback(() => {
+  // forceLogout: called by apiClient when a mid-session refresh fails,
+  // and by the proactive refresh timer when the refresh token has expired.
+  // Accepts an optional reason shown as a banner on the login page.
+  const forceLogout = useCallback((reason?: string) => {
     clearTokens()
     if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-      window.location.replace("/login")
+      const url = reason ? `/login?reason=${reason}` : "/login"
+      window.location.replace(url)
     }
   }, [clearTokens])
 
@@ -258,6 +260,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Schedule a silent refresh 1 minute before the access token expires.
   // This keeps the session alive during inactive periods as long as the
   // httpOnly refresh-token cookie is still valid (7 days).
+  // If the refresh fails (refresh token also expired), redirect to login
+  // immediately so the user never sees a blank screen.
   useEffect(() => {
     if (!accessToken) return
 
@@ -269,8 +273,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const expiresAt = (payload.exp ?? 0) * 1000
       // Refresh 1 minute before expiry (minimum 5 seconds to avoid tight loops)
       const delay = Math.max(5_000, expiresAt - Date.now() - 60_000)
-      timerId = setTimeout(() => {
-        refreshAccessToken()
+      timerId = setTimeout(async () => {
+        const newToken = await refreshAccessToken()
+        if (!newToken) {
+          // Refresh token also expired — session is dead.
+          // forceLogout clears state and redirects to /login?reason=session_expired
+          forceLogout("session_expired")
+        }
       }, delay)
     } catch {
       // Malformed token – don't crash, let normal 401 handling take over
@@ -279,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (timerId) clearTimeout(timerId)
     }
-  }, [accessToken, refreshAccessToken])
+  }, [accessToken, refreshAccessToken, forceLogout])
 
   // ─── Auth actions ────────────────────────────────────────────────────────────
 

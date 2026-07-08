@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   CheckCircle2, XCircle, Clock, AlertTriangle,
-  Zap, SkipForward, RefreshCw
+  Zap, SkipForward, RefreshCw, ChevronLeft, ChevronRight
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -31,9 +31,10 @@ type PreviewItem = {
 }
 
 type ItemState = {
-  include: boolean          // true = generate, false = skip
-  amount_override: number   // what amount to use (defaults to template amount)
-  force_update: boolean     // for updated_since_generated: also update the existing txn
+  include: boolean              // true = generate, false = skip
+  amount_override: number       // what amount to use (defaults to template amount)
+  description_override: string  // what name to save the transaction under
+  force_update: boolean         // for updated_since_generated: also update the existing txn
 }
 
 type GenerateResult = {
@@ -94,17 +95,38 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<GenerateResult | null>(null)
 
-  // ── Load preview when modal opens ────────────────────────────────────────
+  // Internal month/year — defaults to the prop value but user can navigate freely
+  const [selMonth, setSelMonth] = useState(month)
+  const [selYear, setSelYear]   = useState(year)
+
+  // Sync internal selection when props change (e.g. user switches month on the
+  // transactions page and re-opens the modal)
+  useEffect(() => {
+    setSelMonth(month)
+    setSelYear(year)
+  }, [month, year])
+
+  // ── Month navigation ─────────────────────────────────────────────────────
+  const goToPrev = () => {
+    if (selMonth === 1) { setSelMonth(12); setSelYear((y) => y - 1) }
+    else setSelMonth((m) => m - 1)
+  }
+  const goToNext = () => {
+    if (selMonth === 12) { setSelMonth(1); setSelYear((y) => y + 1) }
+    else setSelMonth((m) => m + 1)
+  }
+
+  // ── Load preview when modal opens or selected month changes ──────────────
   useEffect(() => {
     if (!open) { setResult(null); return }
     loadPreview()
-  }, [open, month, year])
+  }, [open, selMonth, selYear])
 
   const loadPreview = async () => {
     setLoading(true)
     setResult(null)
     try {
-      const res  = await apiClient(apiUrl("recurring/preview", { month, year }))
+      const res  = await apiClient(apiUrl("recurring/preview", { month: selMonth, year: selYear }))
       const json = await res.json()
       const data: PreviewItem[] = json.data || []
       setItems(data)
@@ -114,9 +136,10 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
       for (const item of data) {
         init[item.id] = {
           // Include by default only if pending or skipped (not already done)
-          include:        item.status === "pending" || item.status === "skipped" || item.status === "updated_since_generated",
-          amount_override: item.amount,
-          force_update:   false,
+          include:              item.status === "pending" || item.status === "skipped" || item.status === "updated_since_generated",
+          amount_override:      item.amount,
+          description_override: item.description,
+          force_update:         false,
         }
       }
       setStates(init)
@@ -153,10 +176,11 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
       .map((item) => {
         const s = states[item.id]
         return {
-          id:              item.id,
-          skip:            !s.include,
-          amount_override: s.amount_override !== item.amount ? s.amount_override : undefined,
-          force_update:    s.force_update,
+          id:                   item.id,
+          skip:                 !s.include,
+          amount_override:      s.amount_override !== item.amount ? s.amount_override : undefined,
+          description_override: s.description_override !== item.description ? s.description_override : undefined,
+          force_update:         s.force_update,
         }
       })
 
@@ -170,7 +194,7 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
       const res  = await apiClient(apiUrl("recurring/generate"), {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ month, year, items: payload }),
+        body:    JSON.stringify({ month: selMonth, year: selYear, items: payload }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || "Generate failed")
@@ -184,16 +208,36 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const title = `Generate Recurring — ${MONTH_NAMES[month]} ${year}`
-
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" /> {title}
+            <Zap className="h-5 w-5" /> Generate Recurring Transactions
           </DialogTitle>
         </DialogHeader>
+
+        {/* ── Month navigator ───────────────────────────────────────────── */}
+        <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-2">
+          <button
+            onClick={goToPrev}
+            className="p-1 rounded hover:bg-background transition-colors"
+            title="Previous month"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div className="text-center">
+            <p className="font-semibold text-sm">{MONTH_NAMES[selMonth]} {selYear}</p>
+            <p className="text-xs text-muted-foreground">Select the month to generate for</p>
+          </div>
+          <button
+            onClick={goToNext}
+            className="p-1 rounded hover:bg-background transition-colors"
+            title="Next month"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
 
         {/* ── Loading ──────────────────────────────────────────────────── */}
         {loading && (
@@ -211,6 +255,9 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
         {/* ── Result screen ────────────────────────────────────────────── */}
         {result && (
           <div className="space-y-4">
+            <p className="text-sm font-medium text-muted-foreground">
+              Results for {MONTH_NAMES[selMonth]} {selYear}
+            </p>
             <div className="rounded-lg border p-4 space-y-3">
               {result.created.length > 0 && (
                 <div>
@@ -301,24 +348,47 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
                     </div>
                   </div>
 
-                  {/* Row 2: Amount override input (shown only if item is included and not already-done) */}
+                  {/* Row 2: Name + Amount overrides (shown only if item is included and not already-done) */}
                   {s?.include && !isDone && (
-                    <div className="pl-7 flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground w-14 shrink-0">Amount:</span>
-                      <div className="relative max-w-[160px]">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                    <div className="pl-7 space-y-2">
+                      {/* Description override */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground w-14 shrink-0">Name:</span>
                         <Input
-                          type="number"
-                          className="pl-7 h-8 text-sm"
-                          value={s.amount_override}
-                          onChange={(e) => setState(item.id, { amount_override: parseFloat(e.target.value) || 0 })}
+                          type="text"
+                          className="h-8 text-sm flex-1"
+                          value={s.description_override}
+                          onChange={(e) => setState(item.id, { description_override: e.target.value })}
+                          placeholder={item.description}
                         />
+                        {s.description_override !== item.description && (
+                          <button
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                            onClick={() => setState(item.id, { description_override: item.description })}
+                            title="Reset to template name"
+                          >
+                            ↺
+                          </button>
+                        )}
                       </div>
-                      {s.amount_override !== item.amount && (
-                        <span className="text-xs text-muted-foreground">
-                          (template: {fmt(item.amount)})
-                        </span>
-                      )}
+                      {/* Amount override */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground w-14 shrink-0">Amount:</span>
+                        <div className="relative max-w-[160px]">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                          <Input
+                            type="number"
+                            className="pl-7 h-8 text-sm"
+                            value={s.amount_override}
+                            onChange={(e) => setState(item.id, { amount_override: parseFloat(e.target.value) || 0 })}
+                          />
+                        </div>
+                        {s.amount_override !== item.amount && (
+                          <span className="text-xs text-muted-foreground">
+                            (template: {fmt(item.amount)})
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 

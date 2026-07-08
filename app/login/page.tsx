@@ -3,11 +3,12 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react"
 import AuthIllustration from "@/components/auth-illustration"
 import { useAuth } from "@/context/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -15,6 +16,8 @@ import { useToast } from "@/components/ui/use-toast"
 export default function LoginPage() {
   const { login, signup } = useAuth()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const sessionExpired = searchParams.get("reason") === "session_expired"
 
   // Force light mode on login/signup — dark theme from ThemeProvider shouldn't bleed here
   useEffect(() => {
@@ -113,6 +116,17 @@ export default function LoginPage() {
       {/* Right side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md space-y-8">
+          {/* Session expired banner */}
+          {sessionExpired && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-medium">Your session has expired</p>
+                <p className="text-amber-700 text-xs mt-0.5">You were signed out due to inactivity. Please log in again.</p>
+              </div>
+            </div>
+          )}
+
           {/* Tab Navigation */}
           <div className="flex rounded-lg bg-gray-100 p-1">
             <button

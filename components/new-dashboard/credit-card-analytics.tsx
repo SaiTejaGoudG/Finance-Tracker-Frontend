@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import {
   ResponsiveContainer,
   BarChart,
@@ -14,7 +15,7 @@ import { CreditCard } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CreditCardData, CreditCardItem } from "./use-overview-data"
 
-// ─── Palette (one colour per card, consistent) ─────────────────────────────────
+// ─── Palette (one colour per card, consistent) ────────────────────────────────
 
 const CARD_COLORS = [
   "#6366f1", "#f59e0b", "#10b981", "#f43f5e",
@@ -22,7 +23,7 @@ const CARD_COLORS = [
 ]
 function cardColor(idx: number) { return CARD_COLORS[idx % CARD_COLORS.length] }
 
-// ─── Formatters ────────────────────────────────────────────────────────────────
+// ─── Formatters ───────────────────────────────────────────────────────────────
 
 function fmtINR(v: number) {
   if (v >= 100_000) return `₹${(v / 100_000).toFixed(1)}L`
@@ -30,8 +31,12 @@ function fmtINR(v: number) {
   return `₹${v}`
 }
 function fmtFull(v: number) { return `₹${v.toLocaleString("en-IN")}` }
+function fmtDate(d: string | null) {
+  if (!d) return null
+  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+}
 
-// ─── Custom tooltip for chart ──────────────────────────────────────────────────
+// ─── Custom tooltip ───────────────────────────────────────────────────────────
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -58,17 +63,33 @@ function ChartTooltip({ active, payload, label }: any) {
   )
 }
 
-// ─── Per-card row ──────────────────────────────────────────────────────────────
+// ─── Per-card row ─────────────────────────────────────────────────────────────
 
-function CardRow({ card, color, grandTotal }: { card: CreditCardItem; color: string; grandTotal: number }) {
+function CardRow({
+  card, color, grandTotal, selected, onClick,
+}: {
+  card: CreditCardItem
+  color: string
+  grandTotal: number
+  selected: boolean
+  onClick: () => void
+}) {
+  const lastDate = fmtDate(card.last_transaction_date)
   return (
-    <div className="space-y-1.5">
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full text-left space-y-1.5 rounded-lg px-2 py-1.5 -mx-2 transition-colors",
+        selected ? "bg-muted/70" : "hover:bg-muted/40",
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
           <span className="text-sm font-medium truncate">{card.card_name}</span>
           <span className="text-xs text-muted-foreground shrink-0">
             {card.transaction_count} txn{card.transaction_count !== 1 ? "s" : ""}
+            {lastDate && <> · Last: {lastDate}</>}
           </span>
         </div>
         <div className="text-right shrink-0">
@@ -76,25 +97,22 @@ function CardRow({ card, color, grandTotal }: { card: CreditCardItem; color: str
           <span className="text-xs text-muted-foreground ml-1.5">{card.percentage}%</span>
         </div>
       </div>
-      {/* Share bar */}
       <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${card.percentage}%`, backgroundColor: color }}
         />
       </div>
-    </div>
+    </button>
   )
 }
 
-// ─── Skeleton ──────────────────────────────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function Skeleton() {
   return (
     <div className="space-y-6 p-5">
-      {/* Summary pill */}
       <div className="h-14 rounded-xl bg-muted animate-pulse" />
-      {/* Card rows */}
       <div className="space-y-4">
         {[80, 65, 45].map((w, i) => (
           <div key={i} className="space-y-1.5">
@@ -106,13 +124,12 @@ function Skeleton() {
           </div>
         ))}
       </div>
-      {/* Chart */}
       <div className="h-48 rounded-xl bg-muted animate-pulse" />
     </div>
   )
 }
 
-// ─── Props ─────────────────────────────────────────────────────────────────────
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface CreditCardAnalyticsProps {
   data: CreditCardData | null
@@ -120,10 +137,55 @@ interface CreditCardAnalyticsProps {
   className?: string
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// ─── Build Bar elements outside JSX (Recharts can't handle fragments as children) ──
+
+function buildBars(
+  cardIds: string[],
+  cardNames: Record<string, string>,
+  selectedCardId: string | null,
+  selectedColor: string,
+) {
+  if (selectedCardId === null) {
+    // All-cards stacked view
+    return cardIds.map((id, idx) => (
+      <Bar
+        key={id}
+        dataKey={id}
+        name={cardNames[id] ?? id}
+        stackId="cards"
+        fill={cardColor(idx)}
+        radius={idx === cardIds.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+      />
+    ))
+  }
+  // Single-card view
+  return [
+    <Bar
+      key={selectedCardId}
+      dataKey={selectedCardId}
+      name={cardNames[selectedCardId] ?? selectedCardId}
+      fill={selectedColor}
+      radius={[3, 3, 0, 0]}
+    />,
+  ]
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CreditCardAnalytics({ data, loading, className }: CreditCardAnalyticsProps) {
   const isEmpty = !data || data.cards.length === 0
+
+  // null = "All Cards" stacked view; a card_id string = single-card view
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+
+  const handleCardClick = (cardId: string) => {
+    setSelectedCardId((prev) => (prev === cardId ? null : cardId))
+  }
+
+  // Derived values for single-card view
+  const selectedCard    = data?.cards.find((c) => c.card_id === selectedCardId) ?? null
+  const selectedCardIdx = data?.cards.findIndex((c) => c.card_id === selectedCardId) ?? -1
+  const selectedColor   = selectedCardIdx >= 0 ? cardColor(selectedCardIdx) : "#6366f1"
 
   return (
     <div className={cn("rounded-2xl border bg-card shadow-sm", className)}>
@@ -148,7 +210,7 @@ export default function CreditCardAnalytics({ data, loading, className }: Credit
       ) : (
         <div className="p-5 space-y-6">
 
-          {/* ── 1. Summary pill ─────────────────────────────────────────────── */}
+          {/* ── 1. Summary pill ───────────────────────────────────────────── */}
           <div className="flex items-center justify-between rounded-xl bg-indigo-50 dark:bg-indigo-900/20 px-5 py-4">
             <div>
               <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
@@ -164,24 +226,67 @@ export default function CreditCardAnalytics({ data, loading, className }: Credit
             </div>
           </div>
 
-          {/* ── 2. Per-card breakdown ────────────────────────────────────────── */}
-          <div className="space-y-4">
+          {/* ── 2. Per-card rows (clickable) ──────────────────────────────── */}
+          <div className="space-y-1">
             {data!.cards.map((card, idx) => (
               <CardRow
                 key={card.card_id}
                 card={card}
                 color={cardColor(idx)}
                 grandTotal={data!.total}
+                selected={selectedCardId === card.card_id}
+                onClick={() => handleCardClick(card.card_id)}
               />
             ))}
           </div>
 
-          {/* ── 3. Monthly stacked bar chart ─────────────────────────────────── */}
+          {/* ── 3. Monthly chart ──────────────────────────────────────────── */}
           {data!.monthlyData.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-                Monthly spend by card
-              </p>
+              {/* Chart header + card selector chips */}
+              <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {selectedCard
+                    ? `${selectedCard.card_name} — monthly history`
+                    : "Monthly spend by card"}
+                </p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* "All" chip */}
+                  <button
+                    onClick={() => setSelectedCardId(null)}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                      selectedCardId === null
+                        ? "bg-foreground text-background border-foreground"
+                        : "bg-background text-muted-foreground border-border hover:border-foreground/40",
+                    )}
+                  >
+                    All
+                  </button>
+                  {/* One chip per card */}
+                  {data!.cards.map((card, idx) => (
+                    <button
+                      key={card.card_id}
+                      onClick={() => handleCardClick(card.card_id)}
+                      className={cn(
+                        "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                        selectedCardId === card.card_id
+                          ? "text-white border-transparent"
+                          : "bg-background text-muted-foreground border-border hover:border-foreground/40",
+                      )}
+                      style={
+                        selectedCardId === card.card_id
+                          ? { backgroundColor: cardColor(idx), borderColor: cardColor(idx) }
+                          : {}
+                      }
+                    >
+                      {card.card_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chart */}
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -210,21 +315,10 @@ export default function CreditCardAnalytics({ data, loading, className }: Credit
                       width={44}
                     />
                     <Tooltip content={<ChartTooltip />} cursor={{ fill: "currentColor", fillOpacity: 0.04 }} />
-                    <Legend
-                      iconType="circle"
-                      iconSize={7}
-                      wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                    />
-                    {data!.cardIds.map((id, idx) => (
-                      <Bar
-                        key={id}
-                        dataKey={id}
-                        name={data!.cardNames[id] ?? id}
-                        stackId="cards"
-                        fill={cardColor(idx)}
-                        radius={idx === data!.cardIds.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
-                      />
-                    ))}
+                    {selectedCardId === null && (
+                      <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                    )}
+                    {buildBars(data!.cardIds, data!.cardNames, selectedCardId, selectedColor)}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
