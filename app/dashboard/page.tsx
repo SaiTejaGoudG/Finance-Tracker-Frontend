@@ -64,7 +64,7 @@ function DashboardContent() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 3xl:max-w-7xl 3xl:mx-auto w-full">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

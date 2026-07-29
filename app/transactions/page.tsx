@@ -564,7 +564,7 @@ function TransactionsPageContent() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 3xl:max-w-7xl 3xl:mx-auto w-full">
       {/* Recurring modals */}
       <RecurringManageModal
         open={showRecurringManage}

@@ -655,7 +655,7 @@ export default function Dashboard() {
   const selectedMonthDate = new Date(currentYear, currentMonth - 1, 1)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 3xl:max-w-7xl 3xl:mx-auto w-full">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Overview</h1>
