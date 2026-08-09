@@ -10,6 +10,19 @@ import type { OverviewFilters } from "../use-overview-data"
 const fmtINR = (v: number) => `₹${v.toLocaleString("en-IN")}`
 const fmtY   = (v: number) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : v >= 1000 ? `₹${(v/1000).toFixed(0)}K` : `₹${v}`
 
+function CategoryTooltip({ active, payload, label, category }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-popover text-popover-foreground border rounded-lg shadow-md p-2.5 text-xs">
+      <p className="font-semibold mb-1">{label}</p>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted-foreground">{category}</span>
+        <span className="font-medium tabular-nums">{fmtINR(payload[0].value as number)}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function CategoryTrends({ filters }: { filters: OverviewFilters }) {
   const [data, setData]           = useState<any>(null)
   const [loading, setLoading]     = useState(true)
@@ -86,7 +99,7 @@ export default function CategoryTrends({ filters }: { filters: OverviewFilters }
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[
-              { label: "Total",          value: fmtINR(data.total),       color: "text-indigo-600" },
+              { label: "Total",          value: fmtINR(data.total),       color: "text-info-text" },
               { label: "Avg / Month",    value: fmtINR(data.avgPerMonth), color: "text-foreground" },
               { label: "Transactions",   value: `${data.txnCount}`,       color: "text-foreground" },
             ].map(s => (
@@ -107,15 +120,12 @@ export default function CategoryTrends({ filters }: { filters: OverviewFilters }
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.monthlyTrend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
                   barSize={data.monthlyTrend.length > 8 ? 16 : 24}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                  <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
-                  <Tooltip
-                    formatter={(v: any, _: any, p: any) => [fmtINR(v), category]}
-                    labelFormatter={l => l}
-                  />
-                  <ReferenceLine y={avgLine} stroke="#6366f1" strokeDasharray="6 3" strokeWidth={1.5} />
-                  <Bar dataKey="amount" fill="#6366f1" radius={[4,4,0,0]}
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={44} />
+                  <Tooltip content={<CategoryTooltip category={category} />} />
+                  <ReferenceLine y={avgLine} stroke="hsl(var(--chart-1))" strokeDasharray="6 3" strokeWidth={1.5} />
+                  <Bar dataKey="amount" fill="hsl(var(--chart-1))" radius={[4,4,0,0]}
                     label={false}
                   />
                 </BarChart>

@@ -39,12 +39,16 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     <div className="flex h-screen bg-background">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div
+          aria-hidden="true"
+          className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm animate-fade-in lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-background border-r transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-sidebar transition-transform duration-300 ease-in-out lg:static lg:inset-0 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -54,7 +58,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-background border-b px-4 py-3 flex items-center justify-between lg:px-6">
+        <header className="flex items-center justify-between border-b bg-background/80 px-4 py-2.5 backdrop-blur-sm lg:px-6">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
@@ -69,7 +73,9 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center gap-2 h-9 px-2">
                   <Avatar className="h-7 w-7">
-                    <AvatarFallback className="text-xs bg-black text-white">{initials}</AvatarFallback>
+                    <AvatarFallback className="bg-primary text-xs text-primary-foreground">
+                      {initials}
+                    </AvatarFallback>
                   </Avatar>
                   <span className="hidden sm:block text-sm font-medium max-w-[120px] truncate">
                     {user?.name ?? "Account"}
@@ -93,7 +99,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}
-                  className="text-red-600 focus:text-red-600 cursor-pointer"
+                  className="cursor-pointer text-destructive-text focus:text-destructive-text"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out

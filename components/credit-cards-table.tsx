@@ -72,10 +72,10 @@ export default function CreditCardsTable({ creditCards, onEdit, onDelete }: Cred
               <TableRow key={card.id}>
                 <TableCell className="font-medium">{card.cardName}</TableCell>
                 <TableCell className="font-mono text-sm">{`****${last4Digits}`}</TableCell>
-                <TableCell className="font-medium">{formatCurrency(card.cardLimit)}</TableCell>
-                <TableCell>{card.billingCycleDate}th</TableCell>
-                <TableCell>{card.paymentDueDays} days</TableCell>
-                <TableCell>12/30</TableCell>
+                <TableCell className="font-medium tnum">{formatCurrency(card.cardLimit)}</TableCell>
+                <TableCell className="tnum">{card.billingCycleDate}th</TableCell>
+                <TableCell className="tnum">{card.paymentDueDays} days</TableCell>
+                <TableCell className="tnum">12/30</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -90,7 +90,7 @@ export default function CreditCardsTable({ creditCards, onEdit, onDelete }: Cred
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleDeleteClick(card.id, card.cardName)}
-                        className="text-red-600"
+                        className="text-destructive-text"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete

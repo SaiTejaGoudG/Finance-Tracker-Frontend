@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/use-toast"
+import { EmptyState, SkeletonRows } from "@/components/ui/states"
 import { Plus, Pencil, Trash2, Repeat, ChevronDown, ChevronUp } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -207,11 +208,11 @@ export default function RecurringManageModal({ open, onClose }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   const typeColor: Record<string, string> = {
-    Income: "text-green-600 bg-green-50",
-    Expense: "text-red-600 bg-red-50",
-    "Credit Card": "text-purple-600 bg-purple-50",
-    "Petty Cash": "text-orange-600 bg-orange-50",
-    Investment: "text-blue-600 bg-blue-50",
+    Income: "text-success-subtle-foreground bg-success-subtle",
+    Expense: "text-destructive-subtle-foreground bg-destructive-subtle",
+    "Credit Card": "text-info-subtle-foreground bg-info-subtle",
+    "Petty Cash": "text-warning-subtle-foreground bg-warning-subtle",
+    Investment: "text-info-subtle-foreground bg-info-subtle",
   }
 
   return (
@@ -228,13 +229,14 @@ export default function RecurringManageModal({ open, onClose }: Props) {
         {!showForm && (
           <div className="space-y-3">
             {loading ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
+              <SkeletonRows rows={3} columns={3} className="rounded-lg border" />
             ) : templates.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Repeat className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No recurring templates yet.</p>
-                <p className="text-xs mt-1">Create one to stop re-entering the same transactions.</p>
-              </div>
+              <EmptyState
+                icon={Repeat}
+                compact
+                title="No recurring templates yet"
+                description="Create one to stop re-entering the same transactions."
+              />
             ) : (
               templates.map((t) => (
                 <div
@@ -248,13 +250,13 @@ export default function RecurringManageModal({ open, onClose }: Props) {
                         {t.transaction_type}
                       </span>
                       {!t.active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Paused</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Paused</span>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 flex gap-2 flex-wrap">
-                      <span>₹{t.amount.toLocaleString("en-IN")}</span>
+                      <span className="tnum">₹{t.amount.toLocaleString("en-IN")}</span>
                       {t.category && <span>· {t.category}</span>}
-                      <span>· Day {t.day_of_month} of month</span>
+                      <span className="tnum">· Day {t.day_of_month} of month</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -269,7 +271,7 @@ export default function RecurringManageModal({ open, onClose }: Props) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      className="h-8 w-8 text-destructive-text hover:text-destructive-text"
                       onClick={() => handleDelete(t.id)}
                       disabled={deletingId === t.id}
                     >

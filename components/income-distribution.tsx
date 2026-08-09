@@ -108,7 +108,7 @@ export default function IncomeDistribution({ incomeDistribution }: IncomeDistrib
                 <text x="110" y="102" textAnchor="middle" style={{ fill: "hsl(var(--foreground))" }} fontSize="12">
                   Total
                 </text>
-                <text x="110" y="122" textAnchor="middle" style={{ fill: "#16a34a" }} fontSize="16" fontWeight="600">
+                <text x="110" y="122" textAnchor="middle" style={{ fill: "hsl(var(--success-text))" }} fontSize="16" fontWeight="600">
                   {"₹" + total.toLocaleString("en-IN")}
                 </text>
               </svg>
@@ -132,7 +132,7 @@ export default function IncomeDistribution({ incomeDistribution }: IncomeDistrib
                         <span className="truncate text-sm">{slice.category}</span>
                       </div>
                       <div className="text-right shrink-0 tabular-nums">
-                        <div className="font-medium text-sm text-green-600 dark:text-green-400">
+                        <div className="font-medium text-sm text-success-text">
                           ₹{(slice.amount || 0).toLocaleString("en-IN")}
                         </div>
                         <div className="text-xs text-muted-foreground">{slice.percentage.toFixed(1)}%</div>
@@ -146,7 +146,7 @@ export default function IncomeDistribution({ incomeDistribution }: IncomeDistrib
               <div className="border-t pt-2 mt-2 shrink-0">
                 <div className="flex items-center justify-between font-semibold">
                   <span>Total Income</span>
-                  <span className="text-green-600 dark:text-green-400">₹{total.toLocaleString("en-IN")}</span>
+                  <span className="text-success-text">₹{total.toLocaleString("en-IN")}</span>
                 </div>
               </div>
             </div>

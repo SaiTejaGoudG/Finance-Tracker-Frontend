@@ -1,7 +1,7 @@
 "use client"
 
 import { format, parseISO } from "date-fns"
-import { Calendar, CreditCard, DollarSign, FileText, Tag, Clock } from "lucide-react"
+import { Calendar, CreditCard, DollarSign, FileText, Tag, Clock, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import StatusBadge from "@/components/status-badge"
 import type { Transaction } from "./dashboard"
 import CreditCardPaymentDialog from "./credit-card-payment-dialog"
+import { isSyntheticId, SYNTHETIC_ROW_MESSAGE } from "@/lib/tx-id"
 import { useState } from "react"
 
 type TransactionViewDialogProps = {
@@ -32,6 +33,8 @@ export default function TransactionViewDialog({
 
   if (!transaction) return null
 
+  // Projected EMI row from a loan schedule — not a real transaction record
+  const isProjected = isSyntheticId(transaction.id)
   const isCreditCard = transaction.category === "Credit Card"
   const isIncome = transaction.type === "income"
 
@@ -88,7 +91,7 @@ export default function TransactionViewDialog({
         <div className="space-y-6">
           {/* Transaction Amount */}
           <div className="text-center">
-            <div className={`text-3xl font-bold ${isIncome ? "text-green-600" : "text-red-600"}`}>
+            <div className={`text-3xl font-bold tnum ${isIncome ? "text-success-text" : "text-destructive-text"}`}>
               {isIncome ? "+" : "-"}₹{transaction.amount.toFixed(2)}
             </div>
             <div className="text-sm text-muted-foreground mt-1">{isIncome ? "Income" : "Expense"} Transaction</div>
@@ -157,15 +160,30 @@ export default function TransactionViewDialog({
 
           <Separator />
 
+          {/* Projected EMI rows have no transactions-table record, so status
+              cannot be changed here. Explain rather than offering a button that
+              can only fail. */}
+          {isProjected && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-info/25 bg-info-subtle px-3 py-2.5">
+              <Info
+                className="mt-0.5 h-4 w-4 shrink-0 text-info-subtle-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-xs text-info-subtle-foreground">
+                {SYNTHETIC_ROW_MESSAGE}
+              </p>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex gap-2">
-            {isPending && (
+            {!isProjected && isPending && (
               <Button onClick={() => onMakePayment(transaction)} className="flex-1">
                 Mark as Paid
               </Button>
             )}
 
-            {isPaid && (
+            {!isProjected && isPaid && (
               <Button variant="outline" onClick={() => onRevokePayment(transaction)} className="flex-1">
                 Mark as Pending
               </Button>

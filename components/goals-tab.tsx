@@ -11,8 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Target, Calendar, TrendingUp, Star, CheckCircle } from "lucide-react"
+import { Plus, Target, Calendar, TrendingUp, Star, CheckCircle, Flag, Receipt } from "lucide-react"
 import { format, differenceInDays } from "date-fns"
+import { EmptyState } from "@/components/ui/states"
 
 interface FinancialGoal {
   id: string
@@ -279,13 +280,13 @@ export default function GoalsTab() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Active":
-        return <Badge className="bg-green-100 text-green-800">Active</Badge>
+        return <Badge className="bg-success-subtle text-success-subtle-foreground">Active</Badge>
       case "Completed":
-        return <Badge className="bg-blue-100 text-blue-800">Completed</Badge>
+        return <Badge className="bg-info-subtle text-info-subtle-foreground">Completed</Badge>
       case "Paused":
-        return <Badge className="bg-yellow-100 text-yellow-800">Paused</Badge>
+        return <Badge className="bg-warning-subtle text-warning-subtle-foreground">Paused</Badge>
       case "Cancelled":
-        return <Badge className="bg-red-100 text-red-800">Cancelled</Badge>
+        return <Badge className="bg-destructive-subtle text-destructive-subtle-foreground">Cancelled</Badge>
       default:
         return <Badge>{status}</Badge>
     }
@@ -294,11 +295,11 @@ export default function GoalsTab() {
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case "High":
-        return <Badge className="bg-red-100 text-red-800">High</Badge>
+        return <Badge className="bg-destructive-subtle text-destructive-subtle-foreground">High</Badge>
       case "Medium":
-        return <Badge className="bg-yellow-100 text-yellow-800">Medium</Badge>
+        return <Badge className="bg-warning-subtle text-warning-subtle-foreground">Medium</Badge>
       case "Low":
-        return <Badge className="bg-green-100 text-green-800">Low</Badge>
+        return <Badge className="bg-success-subtle text-success-subtle-foreground">Low</Badge>
       default:
         return <Badge>{priority}</Badge>
     }
@@ -336,6 +337,12 @@ export default function GoalsTab() {
     .filter((goal) => goal.status === "Active")
     .reduce((sum, goal) => sum + goal.monthlyContribution, 0)
 
+  const goalMilestones = milestones.filter((milestone) => milestone.goalId === selectedGoal?.id)
+  const goalContributions = contributions
+    .filter((contribution) => contribution.goalId === selectedGoal?.id)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 10)
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
@@ -346,7 +353,7 @@ export default function GoalsTab() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{activeGoals.length}</div>
+            <div className="text-2xl font-bold text-info-text tnum">{activeGoals.length}</div>
             <p className="text-xs text-muted-foreground">{completedGoals.length} completed</p>
           </CardContent>
         </Card>
@@ -357,7 +364,7 @@ export default function GoalsTab() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">₹{totalTargetAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-info-text tnum">₹{totalTargetAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Across active goals</p>
           </CardContent>
         </Card>
@@ -368,7 +375,7 @@ export default function GoalsTab() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">₹{totalCurrentAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-success-text tnum">₹{totalCurrentAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               {((totalCurrentAmount / totalTargetAmount) * 100).toFixed(1)}% of target
             </p>
@@ -381,7 +388,7 @@ export default function GoalsTab() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">₹{totalMonthlyContributions.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-warning-text tnum">₹{totalMonthlyContributions.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Automatic savings</p>
           </CardContent>
         </Card>
@@ -511,6 +518,13 @@ export default function GoalsTab() {
           </div>
         </CardHeader>
         <CardContent>
+          {goals.length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title="No goals yet"
+              description="Create a financial goal to track how close you are to your emergency fund, next holiday or a down payment."
+            />
+          ) : (
           <div className="space-y-4">
             {goals.map((goal) => {
               const progressPercentage = (goal.currentAmount / goal.targetAmount) * 100
@@ -535,20 +549,20 @@ export default function GoalsTab() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Current Amount</p>
-                      <p className="font-semibold text-green-600">₹{goal.currentAmount.toLocaleString()}</p>
+                      <p className="font-semibold text-success-text tnum">₹{goal.currentAmount.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Target Amount</p>
-                      <p className="font-semibold">₹{goal.targetAmount.toLocaleString()}</p>
+                      <p className="font-semibold tnum">₹{goal.targetAmount.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Monthly Contribution</p>
-                      <p className="font-semibold">₹{goal.monthlyContribution.toLocaleString()}</p>
+                      <p className="font-semibold tnum">₹{goal.monthlyContribution.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Days Remaining</p>
                       <p
-                        className={`font-semibold ${daysRemaining < 30 ? "text-red-600" : daysRemaining < 90 ? "text-yellow-600" : "text-green-600"}`}
+                        className={`font-semibold tnum ${daysRemaining < 30 ? "text-destructive-text" : daysRemaining < 90 ? "text-warning-text" : "text-success-text"}`}
                       >
                         {daysRemaining > 0 ? `${daysRemaining} days` : "Overdue"}
                       </p>
@@ -558,10 +572,10 @@ export default function GoalsTab() {
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm">
                       <span>Progress</span>
-                      <span>{progressPercentage.toFixed(1)}%</span>
+                      <span className="tnum">{progressPercentage.toFixed(1)}%</span>
                     </div>
                     <Progress value={Math.min(progressPercentage, 100)} className="h-2" />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground tnum">
                       ₹{(goal.targetAmount - goal.currentAmount).toLocaleString()} remaining
                     </p>
                   </div>
@@ -597,6 +611,7 @@ export default function GoalsTab() {
               )
             })}
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -610,16 +625,22 @@ export default function GoalsTab() {
             {/* Milestones */}
             <div>
               <h3 className="text-lg font-semibold mb-3">Milestones</h3>
+              {goalMilestones.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={Flag}
+                  title="No milestones for this goal"
+                  description="Break the goal into smaller checkpoints to make progress easier to see."
+                />
+              ) : (
               <div className="space-y-2">
-                {milestones
-                  .filter((milestone) => milestone.goalId === selectedGoal?.id)
-                  .map((milestone) => (
+                {goalMilestones.map((milestone) => (
                     <div key={milestone.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center space-x-3">
                         {milestone.status === "Completed" ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <CheckCircle className="h-5 w-5 text-success-text" />
                         ) : (
-                          <Target className="h-5 w-5 text-gray-400" />
+                          <Target className="h-5 w-5 text-muted-foreground" />
                         )}
                         <div>
                           <p className="font-medium">{milestone.title}</p>
@@ -631,9 +652,9 @@ export default function GoalsTab() {
                       </div>
                       <div className="text-right">
                         {milestone.status === "Completed" ? (
-                          <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                          <Badge className="bg-success-subtle text-success-subtle-foreground">Completed</Badge>
                         ) : (
-                          <Badge className="bg-gray-100 text-gray-800">Pending</Badge>
+                          <Badge className="bg-muted text-foreground">Pending</Badge>
                         )}
                         {milestone.completedDate && (
                           <p className="text-xs text-muted-foreground mt-1">
@@ -644,6 +665,7 @@ export default function GoalsTab() {
                     </div>
                   ))}
               </div>
+              )}
             </div>
 
             {/* Contribution History */}
@@ -659,28 +681,39 @@ export default function GoalsTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {contributions
-                    .filter((contribution) => contribution.goalId === selectedGoal?.id)
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                    .slice(0, 10)
-                    .map((contribution) => (
+                  {goalContributions.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={4} className="p-0">
+                        <EmptyState
+                          compact
+                          icon={Receipt}
+                          title="No contributions yet"
+                          description="Money you put towards this goal will be listed here, newest first."
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    goalContributions.map((contribution) => (
                       <TableRow key={contribution.id}>
                         <TableCell>{format(new Date(contribution.date), "MMM dd, yyyy")}</TableCell>
-                        <TableCell className="text-green-600">+₹{contribution.amount.toLocaleString()}</TableCell>
+                        <TableCell className="text-success-text tnum">
+                          +₹{contribution.amount.toLocaleString()}
+                        </TableCell>
                         <TableCell>{contribution.description}</TableCell>
                         <TableCell>
                           <Badge
                             className={
                               contribution.type === "Automatic"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-purple-100 text-purple-800"
+                                ? "bg-info-subtle text-info-subtle-foreground"
+                                : "bg-muted text-foreground"
                             }
                           >
                             {contribution.type}
                           </Badge>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

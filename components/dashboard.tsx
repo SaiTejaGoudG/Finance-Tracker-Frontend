@@ -2,6 +2,7 @@
 
 import { apiUrl } from "@/lib/api"
 import { apiClient } from "@/lib/apiClient"
+import { toTransactionId, SYNTHETIC_ROW_MESSAGE } from "@/lib/tx-id"
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { ArrowUp, ArrowDown, TrendingUp, TrendingDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,6 +25,7 @@ import SavingsTab from "@/components/savings-tab"
 import GoalsTab from "@/components/goals-tab"
 import FreelancingAnalytics from "@/components/freelancing-analytics"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CenteredSpinner, ErrorState } from "@/components/ui/states"
 import { CreditCard, Target } from "lucide-react"
 import TransactionTabs from "./transaction-tabs"
 import { SearchableSelect } from "@/components/ui/searchable-select"
@@ -537,6 +539,19 @@ export default function Dashboard() {
   }
 
   const handleMakePayment = async (transaction: Transaction) => {
+    // EMI rows are projected from a loan schedule and have no transactions
+    // row. parseInt("emi_…") is NaN, which JSON serialises to null and the API
+    // rejects with a misleading 400.
+    const txnId = toTransactionId(transaction.id)
+    if (txnId === null) {
+      toast({
+        title: "Can't update this row",
+        description: SYNTHETIC_ROW_MESSAGE,
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       // Check if this is a credit card transaction
       if (transaction.category === "Credit Card") {
@@ -547,7 +562,7 @@ export default function Dashboard() {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              id: Number.parseInt(transaction.id),
+              id: txnId,
               payment_date: new Date().toISOString().split("T")[0],
               status: "Paid",
             }),
@@ -559,7 +574,7 @@ export default function Dashboard() {
         const res = await apiClient(apiUrl("transaction/update-status"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: Number.parseInt(transaction.id), status: "Paid" }),
+          body: JSON.stringify({ id: txnId, status: "Paid" }),
         })
         if (!res.ok) throw new Error("Failed to update payment status")
       }
@@ -573,6 +588,19 @@ export default function Dashboard() {
   }
 
   const handleRevokePayment = async (transaction: Transaction) => {
+    // EMI rows are projected from a loan schedule and have no transactions
+    // row. parseInt("emi_…") is NaN, which JSON serialises to null and the API
+    // rejects with a misleading 400.
+    const txnId = toTransactionId(transaction.id)
+    if (txnId === null) {
+      toast({
+        title: "Can't update this row",
+        description: SYNTHETIC_ROW_MESSAGE,
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       // Check if this is a credit card transaction
       if (transaction.category === "Credit Card") {
@@ -583,7 +611,7 @@ export default function Dashboard() {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              id: Number.parseInt(transaction.id),
+              id: txnId,
               payment_date: null, // Set payment_date to null when revoking
               status: "Pending",
             }),
@@ -595,7 +623,7 @@ export default function Dashboard() {
         const res = await apiClient(apiUrl("transaction/update-status"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: Number.parseInt(transaction.id), status: "Pending" }),
+          body: JSON.stringify({ id: txnId, status: "Pending" }),
         })
         if (!res.ok) throw new Error("Failed to revoke payment status")
       }
@@ -623,12 +651,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="text-lg mb-2">Loading dashboard...</div>
-          <div className="mt-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          </div>
-        </div>
+        <CenteredSpinner label="Loading dashboard…" />
       </div>
     )
   }
@@ -636,11 +659,11 @@ export default function Dashboard() {
   if (!dashboardData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="text-lg text-red-600 mb-2">Failed to load dashboard data</div>
-          <div className="text-sm text-gray-600 mb-4">{error}</div>
-          <Button onClick={handleRetry}>Retry</Button>
-        </div>
+        <ErrorState
+          title="Failed to load dashboard data"
+          description={error ?? undefined}
+          onRetry={handleRetry}
+        />
       </div>
     )
   }
@@ -676,7 +699,7 @@ export default function Dashboard() {
             ]}
           />
           {usingFallback && (
-            <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200">
+            <div className="text-xs text-warning-subtle-foreground bg-warning-subtle px-2 py-1 rounded border border-warning/25">
               ⚠️ Using demo data
             </div>
           )}
@@ -685,13 +708,13 @@ export default function Dashboard() {
 
       {/* Error Banner */}
       {error && (
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border-warning/25 bg-warning-subtle">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-medium text-orange-800">API Connection Issue</div>
-                <div className="text-sm text-orange-700">{error}</div>
-                <div className="text-xs text-orange-600 mt-1">
+                <div className="font-medium text-warning-subtle-foreground">API Connection Issue</div>
+                <div className="text-sm text-warning-subtle-foreground">{error}</div>
+                <div className="text-xs text-warning-subtle-foreground/80 mt-1">
                   {usingFallback ? "Showing demo data instead" : "Please try again"}
                 </div>
               </div>
@@ -711,12 +734,14 @@ export default function Dashboard() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Income</p>
-                <p className="text-2xl font-bold text-foreground">
+                <p className="text-2xl font-bold text-foreground tnum">
                   ₹{financialSummary.totalIncome.value.toLocaleString("en-IN")}
                 </p>
                 <div className={cn(
-                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium",
-                  financialSummary.totalIncome.direction === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium tnum",
+                  financialSummary.totalIncome.direction === "up"
+                    ? "bg-success-subtle text-success-subtle-foreground"
+                    : "bg-destructive-subtle text-destructive-subtle-foreground"
                 )}>
                   {financialSummary.totalIncome.direction === "up"
                     ? <TrendingUp className="h-3 w-3" />
@@ -724,7 +749,7 @@ export default function Dashboard() {
                   ₹{Math.abs(financialSummary.totalIncome.change).toLocaleString("en-IN")} vs last month
                 </div>
               </div>
-              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-green-500 text-2xl select-none flex-shrink-0">
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-success text-2xl select-none flex-shrink-0">
                 💰
               </span>
             </div>
@@ -737,12 +762,14 @@ export default function Dashboard() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Investments</p>
-                <p className="text-2xl font-bold text-foreground">
+                <p className="text-2xl font-bold text-foreground tnum">
                   ₹{financialSummary.totalInvestment.value.toLocaleString("en-IN")}
                 </p>
                 <div className={cn(
-                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium",
-                  financialSummary.totalInvestment.direction === "up" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium tnum",
+                  financialSummary.totalInvestment.direction === "up"
+                    ? "bg-info-subtle text-info-subtle-foreground"
+                    : "bg-destructive-subtle text-destructive-subtle-foreground"
                 )}>
                   {financialSummary.totalInvestment.direction === "up"
                     ? <TrendingUp className="h-3 w-3" />
@@ -750,7 +777,7 @@ export default function Dashboard() {
                   ₹{Math.abs(financialSummary.totalInvestment.change).toLocaleString("en-IN")} vs last month
                 </div>
               </div>
-              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-blue-500 text-2xl select-none flex-shrink-0">
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-info text-2xl select-none flex-shrink-0">
                 📈
               </span>
             </div>
@@ -763,12 +790,14 @@ export default function Dashboard() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Expenses</p>
-                <p className="text-2xl font-bold text-foreground">
+                <p className="text-2xl font-bold text-foreground tnum">
                   ₹{financialSummary.totalExpense.value.toLocaleString("en-IN")}
                 </p>
                 <div className={cn(
-                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium",
-                  financialSummary.totalExpense.direction === "down" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium tnum",
+                  financialSummary.totalExpense.direction === "down"
+                    ? "bg-success-subtle text-success-subtle-foreground"
+                    : "bg-destructive-subtle text-destructive-subtle-foreground"
                 )}>
                   {financialSummary.totalExpense.direction === "down"
                     ? <TrendingDown className="h-3 w-3" />
@@ -776,7 +805,7 @@ export default function Dashboard() {
                   ₹{Math.abs(financialSummary.totalExpense.change).toLocaleString("en-IN")} vs last month
                 </div>
               </div>
-              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-red-500 text-2xl select-none flex-shrink-0">
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-destructive text-2xl select-none flex-shrink-0">
                 💸
               </span>
             </div>
@@ -790,14 +819,16 @@ export default function Dashboard() {
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Balance</p>
                 <p className={cn(
-                  "text-2xl font-bold",
-                  financialSummary.balance.value >= 0 ? "text-green-600" : "text-red-600"
+                  "text-2xl font-bold tnum",
+                  financialSummary.balance.value >= 0 ? "text-success-text" : "text-destructive-text"
                 )}>
                   {financialSummary.balance.value < 0 ? "−" : ""}₹{Math.abs(financialSummary.balance.value).toLocaleString("en-IN")}
                 </p>
                 <div className={cn(
-                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium",
-                  financialSummary.balance.direction === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                  "inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-xs font-medium tnum",
+                  financialSummary.balance.direction === "up"
+                    ? "bg-success-subtle text-success-subtle-foreground"
+                    : "bg-destructive-subtle text-destructive-subtle-foreground"
                 )}>
                   {financialSummary.balance.direction === "up"
                     ? <TrendingUp className="h-3 w-3" />
@@ -805,9 +836,18 @@ export default function Dashboard() {
                   ₹{Math.abs(financialSummary.balance.change).toLocaleString("en-IN")} vs last month
                 </div>
               </div>
+              {/* Decorative emoji tile. The negative state is ORANGE, not the
+                  amber `--warning` token: amber is the lightest hue at any given
+                  lightness, so a dark emoji washes out on it. Orange-600 keeps
+                  the glyph legible and stays distinct from the red Expenses
+                  tile. Deliberately mode-invariant, same as the category colours
+                  in lib/tx-meta.ts. */}
               <span
-                className="flex items-center justify-center w-11 h-11 rounded-2xl text-2xl select-none flex-shrink-0"
-                style={{ backgroundColor: financialSummary.balance.value >= 0 ? "#10b981" : "#f97316" }}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-2xl select-none"
+                style={{
+                  backgroundColor:
+                    financialSummary.balance.value >= 0 ? "#059669" : "#ea580c",
+                }}
               >
                 ⚖️
               </span>
@@ -882,7 +922,7 @@ export default function Dashboard() {
           {/* Transaction Tabs */}
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Transactions</h2>
-            <Button onClick={handleAddTransaction} className="bg-black text-white hover:bg-gray-800">
+            <Button onClick={handleAddTransaction}>
               + Add Transaction
             </Button>
           </div>

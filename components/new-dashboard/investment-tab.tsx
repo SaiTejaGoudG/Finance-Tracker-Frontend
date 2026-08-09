@@ -8,7 +8,31 @@ import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
 import type { OverviewFilters } from "./use-overview-data"
 
-const COLORS = ["#6366f1","#10b981","#f59e0b","#f43f5e","#3b82f6","#8b5cf6","#ec4899","#14b8a6"]
+const COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--chart-6))",
+  "hsl(var(--chart-7))",
+  "hsl(var(--chart-8))",
+]
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-popover text-popover-foreground border rounded-lg shadow-md p-2.5 text-xs">
+      <p className="font-semibold mb-1">{label}</p>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted-foreground">Invested</span>
+        <span className="font-medium tabular-nums">
+          ₹{(payload[0].value as number).toLocaleString("en-IN")}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 function fmtY(v: number) {
   if (v >= 100_000) return `₹${(v / 100_000).toFixed(1)}L`
@@ -53,9 +77,9 @@ export default function InvestmentTab({ filters, className }: InvestmentTabProps
       {/* Summary pills */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Total Invested",    value: `₹${data.total.toLocaleString("en-IN")}`,            color: "text-indigo-600" },
+          { label: "Total Invested",    value: `₹${data.total.toLocaleString("en-IN")}`,            color: "text-info-text" },
           { label: "Active Months",     value: `${data.activeMonths}`,                               color: "text-foreground" },
-          { label: "Avg / Active Month",value: `₹${data.avgPerMonth.toLocaleString("en-IN")}`,       color: "text-emerald-600" },
+          { label: "Avg / Active Month",value: `₹${data.avgPerMonth.toLocaleString("en-IN")}`,       color: "text-success-text" },
           { label: "Transactions",      value: `${data.txnCount}`,                                   color: "text-foreground" },
         ].map((stat) => (
           <div key={stat.label} className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -74,15 +98,15 @@ export default function InvestmentTab({ filters, className }: InvestmentTabProps
               <AreaChart data={data.monthlyTrend} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="gradInv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
+                    <stop offset="5%"  stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
-                <Tooltip formatter={(v: any) => [`₹${v.toLocaleString("en-IN")}`, "Invested"]} />
-                <Area type="monotone" dataKey="amount" stroke="#6366f1" strokeWidth={2} fill="url(#gradInv)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={44} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="amount" stroke="hsl(var(--chart-1))" strokeWidth={2} fill="url(#gradInv)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

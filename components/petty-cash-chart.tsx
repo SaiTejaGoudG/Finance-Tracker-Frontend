@@ -92,7 +92,7 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
           {totalAmount > 0 && (
             <div className="text-right">
               <div className="text-xs text-muted-foreground">6-month total</div>
-              <div className="text-sm font-semibold text-violet-600 dark:text-violet-400">
+              <div className="text-sm font-semibold text-info-text">
                 {formatCurrency(totalAmount)}
               </div>
             </div>
@@ -110,7 +110,7 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
             <svg
               width={chartW}
               height={chartH}
-              className="w-full bg-gray-50 dark:bg-gray-900 rounded-lg overflow-visible"
+              className="w-full bg-chart-surface rounded-lg overflow-visible"
               onMouseLeave={() => setTooltip(null)}
             >
               {/* Horizontal grid lines + y-axis labels */}
@@ -121,13 +121,12 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
                     <line
                       x1={padding.left} y1={y}
                       x2={chartW - padding.right} y2={y}
-                      stroke="#e5e7eb" strokeWidth="0.5"
-                      className="dark:stroke-gray-700"
+                      stroke="hsl(var(--chart-grid))" strokeWidth="0.5"
                     />
                     <text
                       x={padding.left - 8} y={y + 3}
                       textAnchor="end"
-                      className="fill-gray-500 dark:fill-gray-400"
+                      className="fill-muted-foreground"
                       fontSize="10"
                     >
                       {formatAxisLabel(tick)}
@@ -154,7 +153,7 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
                         height={barH}
                         rx="4"
                         ry="4"
-                        fill="#7c3aed"
+                        fill="hsl(var(--chart-6))"
                         opacity={tooltip?.month === item.month ? 1 : 0.82}
                         className="transition-opacity duration-150 cursor-pointer"
                         onMouseMove={(e) => handleMouseMove(e, item)}
@@ -165,7 +164,7 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
                       <rect
                         x={barX} y={padding.top + areaH - 1}
                         width={barW} height={1}
-                        fill="#7c3aed" opacity={0.3}
+                        fill="hsl(var(--chart-6))" opacity={0.3}
                       />
                     )}
                     {/* Month label */}
@@ -173,7 +172,7 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
                       x={labelX}
                       y={chartH - padding.bottom + 16}
                       textAnchor="middle"
-                      className="fill-gray-600 dark:fill-gray-400"
+                      className="fill-muted-foreground"
                       fontSize="11"
                     >
                       {item.month}
@@ -186,7 +185,7 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
             {/* Hover tooltip */}
             {tooltip && (
               <div
-                className="absolute z-10 bg-gray-900 dark:bg-gray-800 text-white p-3 rounded-lg shadow-lg border border-gray-700 min-w-[150px] pointer-events-none"
+                className="absolute z-10 bg-popover text-popover-foreground border rounded-lg shadow-md p-2.5 text-xs min-w-[150px] pointer-events-none"
                 style={{
                   left: Math.min(tooltip.x + 12, chartW - 170),
                   top:  Math.max(tooltip.y - 12, 4),
@@ -194,8 +193,8 @@ export default function PettyCashChart({ pettyCashTrends }: PettyCashChartProps)
               >
                 <div className="font-semibold text-base mb-1">{tooltip.month}</div>
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "#7c3aed" }} />
-                  <span className="text-gray-300 text-sm">Petty Cash</span>
+                  <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(var(--chart-6))" }} />
+                  <span className="text-muted-foreground text-sm">Petty Cash</span>
                   <span className="font-medium text-sm ml-auto">{formatCurrency(tooltip.amount)}</span>
                 </div>
               </div>

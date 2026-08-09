@@ -2,83 +2,195 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
+/* ==========================================================================
+   Design tokens — "Near-black mono"
+   --------------------------------------------------------------------------
+   Chrome is strictly monochrome (zinc ramp, #09090B → #FAFAFA).
+   Colour appears ONLY where it carries meaning: status, deltas, chart series.
+
+   Rules of thumb:
+   - Interactive/emphasis  → primary        (never bg-black / text-white)
+   - Status pills          → *-subtle + *-subtle-foreground
+   - Solid status fills    → *  + *-foreground
+   - Chart series          → chart-1 … chart-8
+   ========================================================================== */
 
 @layer base {
   :root {
-    --font-sans: var(--font-geist-sans);
-    --font-mono: var(--font-geist-mono);
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* ── Typography ─────────────────────────────────────────────────── */
+    --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono",
+      Menlo, monospace;
+
+    /* ── Surfaces ───────────────────────────────────────────────────── */
+    /* Page sits a touch below card so cards lift without needing shadows */
+    --background: 240 5% 98%;
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --popover-foreground: 240 10% 3.9%;
+
+    /* ── Emphasis ───────────────────────────────────────────────────── */
+    --primary: 240 10% 3.9%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 44%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    /* ── Hairlines & focus ──────────────────────────────────────────── */
+    --border: 240 5.9% 90%;
+    --border-strong: 240 5.3% 82%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+
+    /* ── Semantic colours ───────────────────────────────────────────────
+       Each role has FOUR slots, and they are not interchangeable:
+         *                    solid fill / status dot
+         *-foreground         text sitting on that solid fill
+         *-subtle             tinted pill background
+         *-subtle-foreground  text on the tinted pill
+         *-text               inline text on a page/card surface
+       The `*-text` slot exists because mid-tone fills (amber especially) are
+       far too light to read as text — amber-500 on white is only 2.1:1.
+       Amount figures use *-text; dots and fills use the base.
+       ─────────────────────────────────────────────────────────────────── */
+
+    /* success — money in, paid, gains */
+    --success: 160 84% 39%;
+    --success-foreground: 164 86% 12%;
+    --success-subtle: 152 76% 95%;
+    --success-subtle-foreground: 164 86% 20%;
+    --success-text: 162 94% 24%;
+
+    /* warning — pending, due soon */
+    --warning: 38 92% 50%;
+    --warning-foreground: 28 79% 20%;
+    --warning-subtle: 48 96% 94%;
+    --warning-subtle-foreground: 26 83% 26%;
+    --warning-text: 26 90% 31%;
+
+    /* destructive — money out, overdue, delete */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
+    --destructive-subtle: 0 86% 96%;
+    --destructive-subtle-foreground: 0 63% 35%;
+    --destructive-text: 0 70% 43%;
+
+    /* info — investments, neutral highlight */
+    --info: 239 76% 56%;
+    --info-foreground: 0 0% 100%;
+    --info-subtle: 226 100% 97%;
+    --info-subtle-foreground: 244 47% 38%;
+    --info-text: 243 70% 50%;
+
+    /* ── Chart series (8 — matches the widest existing usage) ───────── */
+    --chart-1: 239 84% 67%; /* indigo  */
+    --chart-2: 38 92% 50%;  /* amber   */
+    --chart-3: 160 84% 39%; /* emerald */
+    --chart-4: 350 89% 60%; /* rose    */
+    --chart-5: 217 91% 60%; /* blue    */
+    --chart-6: 258 90% 66%; /* violet  */
+    --chart-7: 330 81% 60%; /* pink    */
+    --chart-8: 173 80% 40%; /* teal    */
+    --chart-grid: 240 5.9% 90%;
+    --chart-surface: 240 5% 97%;
+
+    /* ── Sidebar (aligned to the zinc core, not a separate hue) ─────── */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 240 10% 3.9%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-border: 240 5.9% 90%;
+    --sidebar-ring: 240 10% 3.9%;
+
+    /* ── Geometry ───────────────────────────────────────────────────── */
+    --radius: 0.625rem;
   }
+
   .dark {
-    --background: 0 0% 3.9%;
+    /* ── Surfaces ───────────────────────────────────────────────────── */
+    /* Card lifts ABOVE page in dark mode (inverse of light) */
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 240 6% 7%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 240 6% 8%;
     --popover-foreground: 0 0% 98%;
+
+    /* ── Emphasis ───────────────────────────────────────────────────── */
     --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+    --primary-foreground: 240 10% 3.9%;
+    --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+
+    /* ── Hairlines & focus ──────────────────────────────────────────── */
+    --border: 240 3.7% 17%;
+    --border-strong: 240 4% 24%;
+    --input: 240 3.7% 17%;
+    --ring: 240 4.9% 83.9%;
+
+    /* ── Semantic ───────────────────────────────────────────────────── */
+    /* Subtle fills become dark tints; their foregrounds become light */
+    --success: 160 84% 39%;
+    --success-foreground: 164 86% 12%;
+    --success-subtle: 162 72% 18%;
+    --success-subtle-foreground: 152 85% 76%;
+    --success-text: 156 72% 62%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 28 79% 20%;
+    --warning-subtle: 32 70% 20%;
+    --warning-subtle-foreground: 45 98% 80%;
+    --warning-text: 43 96% 66%;
+
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --destructive-subtle: 0 62% 21%;
+    --destructive-subtle-foreground: 0 94% 86%;
+    --destructive-text: 0 88% 72%;
+
+    --info: 239 76% 56%;
+    --info-foreground: 0 0% 100%;
+    --info-subtle: 242 58% 24%;
+    --info-subtle-foreground: 228 100% 88%;
+    --info-text: 232 92% 79%;
+
+    /* ── Chart series ───────────────────────────────────────────────────
+       Identical to light mode ON PURPOSE. These are fills on a neutral
+       surface in either theme, so they must stay vivid — an earlier
+       'lift for dark' made every graph look washed out. Only the grid and
+       the plot surface below are mode-specific. */
+    --chart-1: 239 84% 67%;
+    --chart-2: 38 92% 50%;
+    --chart-3: 160 84% 39%;
+    --chart-4: 350 89% 60%;
+    --chart-5: 217 91% 60%;
+    --chart-6: 258 90% 66%;
+    --chart-7: 330 81% 60%;
+    --chart-8: 173 80% 40%;
+    --chart-grid: 240 3.7% 20%;
+    --chart-surface: 221 39% 11%;
+
+    /* ── Sidebar ────────────────────────────────────────────────────── */
+    --sidebar-background: 240 6% 7%;
+    --sidebar-foreground: 240 5% 76%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 240 10% 3.9%;
     --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 17%;
+    --sidebar-ring: 240 4.9% 83.9%;
   }
 }
 
@@ -86,7 +198,56 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    /* Inter's default digit shapes — deliberately NOT enabling cv02/cv03/cv04
+       (open 4/6/9), which changed every numeral in the app. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Consistent focus treatment everywhere, keyboard-only */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Currency and quantities must align in columns */
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Fixed-width digits — apply to any number that sits in a column */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Hairline that survives sub-pixel rounding on hi-dpi displays */
+  .hairline-b {
+    box-shadow: inset 0 -1px 0 0 hsl(var(--border));
+  }
+
+  /* Row action affordance: hidden until the row is hovered or focused */
+  .row-reveal {
+    @apply opacity-0 transition-opacity duration-150;
+  }
+  .group:hover .row-reveal,
+  .group:focus-within .row-reveal,
+  .row-reveal:focus-visible {
+    @apply opacity-100;
+  }
+
+  /* Sticky table header that keeps its hairline while scrolling */
+  .sticky-head {
+    @apply sticky top-0 z-20 bg-card;
+    box-shadow: inset 0 -1px 0 0 hsl(var(--border));
   }
 }

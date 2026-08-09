@@ -17,7 +17,9 @@ import {
 } from "lucide-react"
 import { format, addMonths, parseISO } from "date-fns"
 import { apiClient } from "@/lib/apiClient"
+import PayEmiDialog, { type PayEmiTarget } from "@/components/loans/pay-emi-dialog"
 import { apiUrl } from "@/lib/api"
+import { EmptyState, SkeletonRows } from "@/components/ui/states"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +45,22 @@ interface Loan {
   isPlaceholder?: boolean
 }
 
+/** A row from loan_payments, as returned by GET /loans/:id/payments. */
+interface LoanPayment {
+  id: number
+  payment_date: string
+  amount_paid: number
+  payment_mode: string | null
+  notes: string | null
+}
+
 interface EmiRow {
+  /**
+   * loan_emi_schedule.id — required by POST /loans/:id/pay-emi.
+   * Undefined for rows produced by the local buildSchedule() fallback, which
+   * are projections with no database row; those cannot be marked paid.
+   */
+  id?: number
   emiNo: number
   dueDate: string
   emiAmount: number
@@ -118,6 +135,7 @@ function transformApiLoan(raw: any): Loan {
 function transformApiSchedule(rows: any[]): EmiRow[] {
   const today = new Date()
   return rows.map((r) => ({
+    id:             r.id,
     emiNo:          r.emi_number,
     dueDate:        r.due_date,
     emiAmount:      parseFloat(r.emi_amount),
@@ -215,18 +233,18 @@ const ordinal = (d: number) => `${d}${d === 1 ? "st" : d === 2 ? "nd" : d === 3 
 
 function LoanStatusBadge({ status }: { status: LoanStatus }) {
   const cls: Record<LoanStatus, string> = {
-    Active:     "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-    Closed:     "bg-blue-100 text-blue-800",
-    Foreclosed: "bg-orange-100 text-orange-800",
+    Active:     "bg-success-subtle text-success-subtle-foreground",
+    Closed:     "bg-info-subtle text-info-subtle-foreground",
+    Foreclosed: "bg-warning-subtle text-warning-subtle-foreground",
   }
   return <Badge className={`${cls[status]} font-semibold`}>{status}</Badge>
 }
 
 function EmiStatusBadge({ status }: { status: EmiStatus }) {
   const cls: Record<EmiStatus, string> = {
-    upcoming: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200",
-    paid:     "bg-emerald-100 text-emerald-800",
-    overdue:  "bg-red-100 text-red-800",
+    upcoming: "bg-info-subtle text-info-subtle-foreground",
+    paid:     "bg-success-subtle text-success-subtle-foreground",
+    overdue:  "bg-destructive-subtle text-destructive-subtle-foreground",
   }
   const label: Record<EmiStatus, string> = { upcoming: "Upcoming", paid: "Paid", overdue: "Overdue" }
   return <Badge className={`${cls[status]} text-xs font-medium`}>{label[status]}</Badge>
@@ -238,8 +256,8 @@ function KpiTile({
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
       <p className="text-xs text-muted-foreground uppercase tracking-wider leading-none">{label}</p>
-      <p className={`text-xl font-bold tabular-nums mt-2 ${valueClass}`}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      <p className={`text-xl font-bold tnum mt-2 ${valueClass}`}>{value}</p>
+      {sub && <p className="text-xs text-muted-foreground mt-1 tnum">{sub}</p>}
     </div>
   )
 }
@@ -334,7 +352,7 @@ function AddLoanDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-black text-white hover:bg-gray-800 gap-1.5">
+        <Button className="gap-1.5">
           <Plus className="h-4 w-4" /> Add Loan
         </Button>
       </DialogTrigger>
@@ -401,8 +419,8 @@ function AddLoanDialog({
           <div className="rounded-xl border bg-muted/30 p-3.5 space-y-3">
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">EMI Details</p>
             {computedEmi > 0 && (
-              <p className="text-xs text-blue-600">
-                Auto-computed EMI: <span className="font-bold">{fmtINR(computedEmi)}</span> — override below if KFS shows different.
+              <p className="text-xs text-info-text">
+                Auto-computed EMI: <span className="font-bold tnum">{fmtINR(computedEmi)}</span> — override below if KFS shows different.
               </p>
             )}
             <div className="grid grid-cols-2 gap-4">
@@ -467,7 +485,6 @@ function AddLoanDialog({
         <div className="px-5 py-4 border-t shrink-0 flex justify-end gap-2">
           <Button variant="outline" onClick={() => { setForm(BLANK_FORM); setOpen(false) }}>Cancel</Button>
           <Button
-            className="bg-black text-white hover:bg-gray-800"
             disabled={!isValid}
             onClick={handleSubmit}
           >
@@ -509,23 +526,32 @@ function LoansOverview({
           label="Total Outstanding"
           value={fmtINR(totalOutstanding)}
           sub={`Across ${activeCount} active loan${activeCount !== 1 ? "s" : ""}`}
-          valueClass="text-rose-600"
+          valueClass="text-destructive-text"
         />
         <KpiTile
           label="Monthly EMI Commitment"
           value={fmtINR(totalMonthlyEmi)}
           sub="Combined EMI due each month"
-          valueClass="text-amber-600"
+          valueClass="text-warning-text"
         />
         <KpiTile
           label="Active Loans"
           value={String(activeCount)}
           sub="Currently being repaid"
-          valueClass="text-blue-600"
+          valueClass="text-info-text"
         />
       </div>
 
       {/* ── Loan cards ─────────────────────────────────────────────────── */}
+      {loans.length === 0 ? (
+        <EmptyState
+          className="rounded-2xl border border-dashed"
+          icon={Landmark}
+          title="No loans tracked yet"
+          description="Add a loan to see its EMI schedule, amortization breakdown and part-payment impact."
+          action={<AddLoanDialog onSuccess={onAddSuccess} />}
+        />
+      ) : (
       <div className="space-y-4">
         {loans.map(loan => {
           const schedule = buildSchedule(loan)
@@ -555,7 +581,7 @@ function LoansOverview({
                         <h3 className="font-semibold text-base leading-tight">{loan.bankName}</h3>
                         <LoanStatusBadge status={loan.status} />
                         {loan.isPlaceholder && (
-                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                          <Badge variant="outline" className="text-xs text-warning-text border-warning/25">
                             KFS Pending
                           </Badge>
                         )}
@@ -579,13 +605,13 @@ function LoansOverview({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                   {[
                     { label: "Net Disbursed",  value: fmtINR(loan.netDisbursedAmount), color: "text-foreground" },
-                    { label: "Outstanding",     value: fmtINR(outstanding),              color: "text-rose-600" },
+                    { label: "Outstanding",     value: fmtINR(outstanding),              color: "text-destructive-text" },
                     { label: "Monthly EMI",     value: fmtINR(loan.standardEmi),         color: "text-foreground" },
-                    { label: "Total Interest",  value: fmtINR(totalInterest),            color: "text-amber-600" },
+                    { label: "Total Interest",  value: fmtINR(totalInterest),            color: "text-warning-text" },
                   ].map(m => (
                     <div key={m.label} className="rounded-xl bg-muted/40 px-3 py-2">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{m.label}</p>
-                      <p className={`text-sm font-bold tabular-nums mt-0.5 ${m.color}`}>{m.value}</p>
+                      <p className={`text-sm font-bold tnum mt-0.5 ${m.color}`}>{m.value}</p>
                     </div>
                   ))}
                 </div>
@@ -594,10 +620,10 @@ function LoansOverview({
                 <div className="space-y-1.5 mb-4">
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Repayment progress</span>
-                    <span className="font-medium">{progressPct.toFixed(1)}%</span>
+                    <span className="font-medium tnum">{progressPct.toFixed(1)}%</span>
                   </div>
                   <Progress value={progressPct} className="h-2" />
-                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <div className="flex justify-between text-[11px] text-muted-foreground tnum">
                     <span>Paid: {fmtINR(paidAmount)}</span>
                     <span>Remaining: {fmtINR(totalPayable - paidAmount)}</span>
                   </div>
@@ -608,9 +634,9 @@ function LoansOverview({
                   <div className="flex items-center gap-2 rounded-xl border border-dashed px-3 py-2 text-xs">
                     <CalendarClock className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="text-muted-foreground">Next EMI:</span>
-                    <span className="font-semibold">{fmtDate(nextEmi.dueDate)}</span>
+                    <span className="font-semibold tnum">{fmtDate(nextEmi.dueDate)}</span>
                     <span className="text-muted-foreground">·</span>
-                    <span className="font-semibold" style={{ color: loan.accentColor }}>{fmtINR(nextEmi.emiAmount)}</span>
+                    <span className="font-semibold tnum" style={{ color: loan.accentColor }}>{fmtINR(nextEmi.emiAmount)}</span>
                     <EmiStatusBadge status={nextEmi.status} />
                   </div>
                 )}
@@ -619,6 +645,7 @@ function LoansOverview({
           )
         })}
       </div>
+      )}
     </div>
   )
 }
@@ -626,11 +653,13 @@ function LoansOverview({
 // ─── Detail: full loan deep-dive ──────────────────────────────────────────────
 
 function LoanDetail({
-  loan, onBack, apiSchedule,
+  loan, onBack, apiSchedule, onRefresh,
 }: {
   loan: Loan
   onBack: () => void
   apiSchedule?: EmiRow[]
+  /** Refetch loans + schedule after a payment changes the balances. */
+  onRefresh: () => void
 }) {
   const schedule = useMemo(
     () => apiSchedule?.length ? apiSchedule : buildSchedule(loan),
@@ -648,6 +677,35 @@ function LoanDetail({
   const remainingMonths = loan.tenureMonths - loan.paidEmis
   const nextEmi         = schedule[loan.paidEmis]
 
+  // ── EMI payment ────────────────────────────────────────────────────────────
+  const [payTarget, setPayTarget] = useState<PayEmiTarget | null>(null)
+
+  // ── Real payment history (GET /loans/:id/payments) ─────────────────────────
+  // Previously this tab displayed schedule.slice(0, paidEmis) — a projection of
+  // what *should* have been paid, not a record of what was. It could not show
+  // the actual payment date, amount or mode.
+  const [payments, setPayments] = useState<LoanPayment[] | null>(null)
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
+
+  const fetchPayments = useCallback(async () => {
+    setPaymentsLoading(true)
+    try {
+      const res = await apiClient(apiUrl(`/loans/${loan.id}/payments`))
+      if (res.ok) {
+        const json = await res.json()
+        setPayments(Array.isArray(json.data) ? json.data : [])
+      } else {
+        setPayments([])
+      }
+    } catch {
+      setPayments([])
+    } finally {
+      setPaymentsLoading(false)
+    }
+  }, [loan.id])
+
+  useEffect(() => { fetchPayments() }, [fetchPayments])
+
   // Prepayment calculator state
   const [prepayAmt,  setPrepayAmt]  = useState("")
   const [prepayMode, setPrepayMode] = useState<"reduce_tenure" | "reduce_emi">("reduce_tenure")
@@ -658,7 +716,7 @@ function LoanDetail({
     setImpact(calcPrepaymentImpact(outstanding, loan.apr, remainingMonths, loan.standardEmi, amt, prepayMode))
   }
 
-  const tabCls = "data-[state=active]:bg-black data-[state=active]:text-white dark:data-[state=active]:bg-white dark:data-[state=active]:text-black data-[state=active]:shadow-sm"
+  const tabCls = "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
 
   return (
     <div className="space-y-5">
@@ -673,7 +731,7 @@ function LoanDetail({
             <h2 className="text-xl font-bold">{loan.bankName} — {loan.loanType}</h2>
             <LoanStatusBadge status={loan.status} />
             {loan.isPlaceholder && (
-              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+              <Badge variant="outline" className="text-xs text-warning-text border-warning/25">
                 KFS Pending — data is approximate
               </Badge>
             )}
@@ -687,10 +745,10 @@ function LoanDetail({
 
       {/* ── 4 hero KPIs ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KpiTile label="Outstanding Principal" value={fmtINR(outstanding)}                    sub={`${remainingMonths} months left`}     valueClass="text-rose-600" />
+        <KpiTile label="Outstanding Principal" value={fmtINR(outstanding)}                    sub={`${remainingMonths} months left`}     valueClass="text-destructive-text" />
         <KpiTile label="Amount Paid"            value={fmtINR(paidAmount)}                    sub={`${loan.paidEmis} of ${loan.tenureMonths} EMIs`} />
-        <KpiTile label="Next EMI"               value={nextEmi ? fmtINR(nextEmi.emiAmount) : "—"} sub={nextEmi ? fmtDate(nextEmi.dueDate) : "All paid"} valueClass="text-blue-600" />
-        <KpiTile label="Remaining Payable"      value={fmtINR(remainingAmount)}               sub="Including future interest"           valueClass="text-amber-600" />
+        <KpiTile label="Next EMI"               value={nextEmi ? fmtINR(nextEmi.emiAmount) : "—"} sub={nextEmi ? fmtDate(nextEmi.dueDate) : "All paid"} valueClass="text-info-text" />
+        <KpiTile label="Remaining Payable"      value={fmtINR(remainingAmount)}               sub="Including future interest"           valueClass="text-warning-text" />
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────────────── */}
@@ -725,7 +783,7 @@ function LoanDetail({
                   ].map(row => (
                     <div key={row.l} className="flex justify-between items-center py-2.5 text-sm">
                       <span className="text-muted-foreground">{row.l}</span>
-                      <span className="font-medium tabular-nums">{row.v}</span>
+                      <span className="font-medium tnum">{row.v}</span>
                     </div>
                   ))}
                 </div>
@@ -733,15 +791,15 @@ function LoanDetail({
                 <div className="space-y-0 pl-0 sm:pl-6 divide-y">
                   {[
                     { l: "Total Payable Amount",   v: fmtINR(totalPayable),   cls: "" },
-                    { l: "Total Interest Payable", v: fmtINR(totalInterest),  cls: "text-amber-600" },
-                    { l: "Outstanding Principal",  v: fmtINR(outstanding),    cls: "text-rose-600" },
-                    { l: "Amount Paid",            v: fmtINR(paidAmount),     cls: "text-emerald-600" },
+                    { l: "Total Interest Payable", v: fmtINR(totalInterest),  cls: "text-warning-text" },
+                    { l: "Outstanding Principal",  v: fmtINR(outstanding),    cls: "text-destructive-text" },
+                    { l: "Amount Paid",            v: fmtINR(paidAmount),     cls: "text-success-text" },
                     { l: "Remaining Amount",       v: fmtINR(remainingAmount), cls: "" },
                     { l: "EMIs Remaining",         v: `${remainingMonths} of ${loan.tenureMonths}`, cls: "" },
                   ].map(row => (
                     <div key={row.l} className="flex justify-between items-center py-2.5 text-sm">
                       <span className="text-muted-foreground">{row.l}</span>
-                      <span className={`font-bold tabular-nums ${row.cls}`}>{row.v}</span>
+                      <span className={`font-bold tnum ${row.cls}`}>{row.v}</span>
                     </div>
                   ))}
                 </div>
@@ -754,20 +812,20 @@ function LoanDetail({
             <CardContent className="p-5 space-y-4">
               <div className="flex justify-between items-center text-sm">
                 <span className="font-medium">Repayment Progress</span>
-                <span className="font-bold">{progressPct.toFixed(1)}%</span>
+                <span className="font-bold tnum">{progressPct.toFixed(1)}%</span>
               </div>
               <Progress value={progressPct} className="h-3 rounded-full" />
               <div className="grid grid-cols-3 gap-3 pt-1">
                 {[
-                  { label: "Principal Paid",    value: fmtINR(paidPrincipal), color: "#2563eb" },
-                  { label: "Interest Paid",     value: fmtINR(paidInterest),  color: "#f59e0b" },
-                  { label: "Principal Remaining", value: fmtINR(outstanding), color: "#ef4444" },
+                  { label: "Principal Paid",    value: fmtINR(paidPrincipal), dot: "bg-info" },
+                  { label: "Interest Paid",     value: fmtINR(paidInterest),  dot: "bg-warning" },
+                  { label: "Principal Remaining", value: fmtINR(outstanding), dot: "bg-destructive" },
                 ].map(m => (
                   <div key={m.label} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                    <div className={`w-3 h-3 rounded-full shrink-0 ${m.dot}`} />
                     <div>
                       <p className="text-[10px] text-muted-foreground uppercase">{m.label}</p>
-                      <p className="text-sm font-bold tabular-nums">{m.value}</p>
+                      <p className="text-sm font-bold tnum">{m.value}</p>
                     </div>
                   </div>
                 ))}
@@ -781,23 +839,23 @@ function LoanDetail({
               <p className="text-sm font-medium mb-3">Total Cost Breakdown</p>
               <div className="flex items-center gap-0 rounded-full overflow-hidden h-5 mb-3">
                 <div
-                  className="h-full bg-blue-500 transition-all"
+                  className="h-full bg-info transition-all"
                   style={{ width: `${(loan.netDisbursedAmount / totalPayable) * 100}%` }}
                   title={`Principal ${fmtINR(loan.netDisbursedAmount)}`}
                 />
                 <div
-                  className="h-full bg-amber-400 transition-all"
+                  className="h-full bg-warning transition-all"
                   style={{ width: `${(totalInterest / totalPayable) * 100}%` }}
                   title={`Interest ${fmtINR(totalInterest)}`}
                 />
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
+              <div className="flex justify-between text-xs text-muted-foreground tnum">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-info inline-block" />
                   Principal {fmtINR(loan.netDisbursedAmount)} ({((loan.netDisbursedAmount/totalPayable)*100).toFixed(1)}%)
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-warning inline-block" />
                   Interest {fmtINR(totalInterest)} ({((totalInterest/totalPayable)*100).toFixed(1)}%)
                 </span>
               </div>
@@ -829,23 +887,58 @@ function LoanDetail({
                         <TableHead className="text-right">Interest</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
                         <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="w-24 text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {schedule.map(row => (
+                      {schedule.length === 0 ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={8} className="p-0">
+                            <EmptyState
+                              compact
+                              icon={CalendarClock}
+                              title="No schedule available"
+                              description="The amortization schedule for this loan could not be generated yet."
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        schedule.map(row => (
                         <TableRow
                           key={row.emiNo}
-                          className={row.status === "paid" ? "opacity-50" : row.status === "overdue" ? "bg-red-50/50 dark:bg-red-950/20" : ""}
+                          className={row.status === "paid" ? "opacity-50" : row.status === "overdue" ? "bg-destructive-subtle" : ""}
                         >
                           <TableCell className="text-center text-muted-foreground text-xs font-mono">{row.emiNo}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{fmtDate(row.dueDate)}</TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums text-sm">{fmtINR(row.emiAmount)}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm text-blue-600">{fmtINR(row.principal)}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm text-amber-600">{fmtINR(row.interest)}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm text-rose-600">{fmtINR(row.closingBalance)}</TableCell>
+                          <TableCell className="text-sm tnum">{fmtDate(row.dueDate)}</TableCell>
+                          <TableCell className="text-right font-semibold tnum text-sm">{fmtINR(row.emiAmount)}</TableCell>
+                          <TableCell className="text-right tnum text-sm text-info-text">{fmtINR(row.principal)}</TableCell>
+                          <TableCell className="text-right tnum text-sm text-warning-text">{fmtINR(row.interest)}</TableCell>
+                          <TableCell className="text-right tnum text-sm text-destructive-text">{fmtINR(row.closingBalance)}</TableCell>
                           <TableCell className="text-center"><EmiStatusBadge status={row.status} /></TableCell>
+                          <TableCell className="text-right">
+                            {/* Only rows backed by a real loan_emi_schedule row can
+                                be paid — the local buildSchedule() fallback has no id. */}
+                            {row.status !== "paid" && row.id !== undefined && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => setPayTarget({
+                                  scheduleId: row.id!,
+                                  emiNo:      row.emiNo,
+                                  dueDate:    row.dueDate,
+                                  emiAmount:  row.emiAmount,
+                                  principal:  row.principal,
+                                  interest:   row.interest,
+                                })}
+                              >
+                                Mark paid
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
-                      ))}
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -856,70 +949,61 @@ function LoanDetail({
 
         {/* ── Payment History ──────────────────────────────────────────── */}
         <TabsContent value="history" className="mt-4">
-          {loan.paidEmis === 0 ? (
-            <Card className="shadow-sm">
-              <CardContent className="py-16 flex flex-col items-center justify-center gap-3 text-center">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium">No payments yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    First EMI is due on {nextEmi ? fmtDate(nextEmi.dueDate) : "—"}
-                  </p>
-                </div>
-                {nextEmi && (
-                  <div className="mt-2 rounded-xl border px-4 py-3 text-sm text-center">
-                    <p className="text-muted-foreground text-xs mb-1">Upcoming EMI</p>
-                    <p className="font-bold text-lg">{fmtINR(nextEmi.emiAmount)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      ₹{nextEmi.principal.toLocaleString("en-IN")} principal + ₹{nextEmi.interest.toLocaleString("en-IN")} interest
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="shadow-sm">
-              <CardContent className="p-0">
+          <Card className="shadow-sm">
+            <CardContent className="p-0">
+              {paymentsLoading ? (
+                <SkeletonRows rows={4} columns={5} />
+              ) : !payments || payments.length === 0 ? (
+                <EmptyState
+                  icon={Clock}
+                  title="No payments recorded yet"
+                  description={
+                    nextEmi
+                      ? `Next EMI of ${fmtINR(nextEmi.emiAmount)} is due on ${fmtDate(nextEmi.dueDate)}. Record it from the EMI Schedule tab.`
+                      : "Record a payment from the EMI Schedule tab."
+                  }
+                />
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Payment Date</TableHead>
+                      <TableHead>Paid On</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Principal</TableHead>
-                      <TableHead className="text-right">Interest</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {schedule.slice(0, loan.paidEmis).map(row => (
-                      <TableRow key={row.emiNo}>
-                        <TableCell className="text-sm">{fmtDate(row.dueDate)}</TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">{fmtINR(row.emiAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-blue-600">{fmtINR(row.principal)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-amber-600">{fmtINR(row.interest)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-rose-600">{fmtINR(row.closingBalance)}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge className="bg-emerald-100 text-emerald-800 text-xs">Paid</Badge>
+                    {payments.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="text-sm tnum">{fmtDate(p.payment_date)}</TableCell>
+                        <TableCell className="text-right font-semibold tnum">
+                          {fmtINR(p.amount_paid)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {(p.payment_mode || "manual").replace(/_/g, " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {p.notes || "—"}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── Part Payment ─────────────────────────────────────────────── */}
         <TabsContent value="prepayment" className="mt-4 space-y-4">
 
           {/* Info banner */}
-          <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3.5 text-sm">
-            <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-            <p className="text-blue-800 dark:text-blue-200">
+          <div className="flex items-start gap-3 rounded-xl border border-info/25 bg-info-subtle p-3.5 text-sm">
+            <Info className="h-4 w-4 text-info-subtle-foreground shrink-0 mt-0.5" />
+            <p className="text-info-subtle-foreground">
               Part payment directly reduces your outstanding principal. You can choose to either reduce your EMI amount
               (keeping tenure the same) or reduce tenure (keeping EMI the same). The calculator below shows the
               impact before you make a payment.
@@ -949,7 +1033,7 @@ function LoanDetail({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Current outstanding: <span className="font-semibold text-rose-600">{fmtINR(outstanding)}</span>
+                    Current outstanding: <span className="font-semibold text-destructive-text tnum">{fmtINR(outstanding)}</span>
                   </p>
                 </div>
 
@@ -964,7 +1048,7 @@ function LoanDetail({
                         key={opt.value}
                         type="button"
                         onClick={() => setPrepayMode(opt.value as "reduce_tenure" | "reduce_emi")}
-                        className={`text-left rounded-xl border p-3 transition-all ${prepayMode === opt.value ? "border-black bg-black/5 dark:border-white dark:bg-white/5" : "border-muted hover:border-muted-foreground"}`}
+                        className={`text-left rounded-xl border p-3 transition-colors ${prepayMode === opt.value ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground"}`}
                       >
                         <p className={`text-sm font-semibold ${prepayMode === opt.value ? "text-foreground" : "text-muted-foreground"}`}>
                           {opt.title}
@@ -976,7 +1060,7 @@ function LoanDetail({
                 </div>
 
                 <div className="flex gap-2">
-                  <Button className="flex-1 bg-black text-white hover:bg-gray-800" onClick={handleCalcImpact}>
+                  <Button className="flex-1" onClick={handleCalcImpact}>
                     Calculate Impact
                   </Button>
                   {impact && (
@@ -1012,7 +1096,7 @@ function LoanDetail({
             <Card className={`shadow-sm transition-opacity ${impact ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <TrendingDown className="h-4 w-4 text-emerald-600" /> Impact Summary
+                  <TrendingDown className="h-4 w-4 text-success-text" /> Impact Summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1025,19 +1109,19 @@ function LoanDetail({
                       ].map(m => (
                         <div key={m.label} className="rounded-xl border p-3">
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">{m.label}</p>
-                          <p className="text-xs text-muted-foreground line-through">{m.before}</p>
-                          <p className={`text-base font-bold tabular-nums ${m.changed ? "text-emerald-600" : ""}`}>{m.after}</p>
+                          <p className="text-xs text-muted-foreground line-through tnum">{m.before}</p>
+                          <p className={`text-base font-bold tnum ${m.changed ? "text-success-text" : ""}`}>{m.after}</p>
                         </div>
                       ))}
                     </div>
 
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 p-4">
+                    <div className="rounded-xl border border-success/25 bg-success-subtle p-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Interest Saved</p>
+                        <CheckCircle2 className="h-4 w-4 text-success-subtle-foreground" />
+                        <p className="text-sm font-semibold text-success-subtle-foreground">Interest Saved</p>
                       </div>
-                      <p className="text-2xl font-bold tabular-nums text-emerald-600">{fmtINR(impact.interestSaved)}</p>
-                      <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                      <p className="text-2xl font-bold tnum text-success-subtle-foreground">{fmtINR(impact.interestSaved)}</p>
+                      <p className="text-xs text-success-subtle-foreground mt-1">
                         {prepayMode === "reduce_tenure"
                           ? `Loan closes ${remainingMonths - impact.newTenure} months early`
                           : `EMI reduces by ${fmtINR(loan.standardEmi - impact.newEmi)} / month`}
@@ -1045,7 +1129,7 @@ function LoanDetail({
                     </div>
 
                     <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground space-y-0.5">
-                      <p>• New outstanding after payment: <span className="font-semibold text-foreground">{fmtINR(outstanding - Number(prepayAmt.replace(/,/g, "")))}</span></p>
+                      <p>• New outstanding after payment: <span className="font-semibold text-foreground tnum">{fmtINR(outstanding - Number(prepayAmt.replace(/,/g, "")))}</span></p>
                       <p>• All calculations are estimates based on reducing balance method.</p>
                       <p>• Actual figures may vary due to bank-specific processing dates.</p>
                     </div>
@@ -1061,21 +1145,33 @@ function LoanDetail({
           </div>
 
           {/* Preclosure info */}
-          <Card className="shadow-sm border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+          <Card className="shadow-sm border-warning/25 bg-warning-subtle">
             <CardContent className="p-4 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-warning-subtle-foreground shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-semibold text-amber-800 dark:text-amber-200">Preclosure / Full Settlement</p>
-                <p className="text-amber-700 dark:text-amber-300 mt-1">
+                <p className="font-semibold text-warning-subtle-foreground">Preclosure / Full Settlement</p>
+                <p className="text-warning-subtle-foreground mt-1">
                   Full preclosure calculates your outstanding principal + foreclosure charges + applicable GST.
                   This feature will be enabled once the loan has at least one EMI payment on record.
-                  Current outstanding for settlement: <span className="font-bold">{fmtINR(outstanding)}</span>
+                  Current outstanding for settlement: <span className="font-bold tnum">{fmtINR(outstanding)}</span>
                 </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PayEmiDialog
+        loanId={loan.id}
+        target={payTarget}
+        open={payTarget !== null}
+        onOpenChange={(open) => { if (!open) setPayTarget(null) }}
+        onPaid={() => {
+          // Balances, schedule status and history all changed server-side
+          fetchPayments()
+          onRefresh()
+        }}
+      />
     </div>
   )
 }
@@ -1109,8 +1205,10 @@ export default function LoansTab() {
     fetchLoans()
   }, [fetchLoans])
 
-  const fetchSchedule = useCallback(async (loanId: string) => {
-    if (schedules[loanId]) return  // already cached
+  const fetchSchedule = useCallback(async (loanId: string, force = false) => {
+    // Cached unless forced — after a payment the row statuses have changed
+    // server-side, so the cached copy is stale.
+    if (!force && schedules[loanId]) return
     try {
       const res = await apiClient(apiUrl(`/loans/${loanId}/schedule`))
       if (res.ok) {
@@ -1135,6 +1233,12 @@ export default function LoansTab() {
         loan={selectedLoan}
         onBack={() => setSelectedId(null)}
         apiSchedule={schedules[selectedLoan.id]}
+        onRefresh={() => {
+          // Paying an EMI changes outstanding principal, remaining EMIs and the
+          // schedule row status, so both need refetching.
+          fetchLoans()
+          fetchSchedule(selectedLoan.id, true)
+        }}
       />
     )
     : (

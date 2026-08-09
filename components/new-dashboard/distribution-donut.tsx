@@ -14,9 +14,10 @@ import type { DistributionData, DistributionItem } from "./use-overview-data"
 // ─── Category colors ───────────────────────────────────────────────────────────
 
 const PALETTE = [
-  "#6366f1", "#10b981", "#f59e0b", "#f43f5e", "#3b82f6",
-  "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#84cc16",
-  "#06b6d4", "#a855f7",
+  "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--chart-6))",
+  "hsl(var(--chart-7))", "hsl(var(--chart-8))", "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))",
 ]
 
 function getColor(idx: number) {

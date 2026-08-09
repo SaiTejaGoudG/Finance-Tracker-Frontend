@@ -21,40 +21,40 @@ export default function TransactionSummary({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-          <ArrowDownIcon className="h-4 w-4 text-green-600" />
+          <ArrowDownIcon className="h-4 w-4 text-success-text" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">₹{totalIncome.toLocaleString()}</div>
+          <div className="text-2xl font-bold tnum text-success-text">₹{totalIncome.toLocaleString()}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-          <ArrowUpIcon className="h-4 w-4 text-red-600" />
+          <ArrowUpIcon className="h-4 w-4 text-destructive-text" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-600">₹{totalExpenses.toLocaleString()}</div>
+          <div className="text-2xl font-bold tnum text-destructive-text">₹{totalExpenses.toLocaleString()}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Investments</CardTitle>
-          <TrendingUpIcon className="h-4 w-4 text-blue-600" />
+          <TrendingUpIcon className="h-4 w-4 text-info-text" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-blue-600">₹{totalInvestments.toLocaleString()}</div>
+          <div className="text-2xl font-bold tnum text-info-text">₹{totalInvestments.toLocaleString()}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Balance</CardTitle>
-          <ArrowDownIcon className="h-4 w-4 text-gray-600" />
+          <ArrowDownIcon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+          <div className={`text-2xl font-bold tnum ${balance >= 0 ? "text-success-text" : "text-destructive-text"}`}>
             ₹{Math.abs(balance).toLocaleString()}
           </div>
         </CardContent>

@@ -5,7 +5,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
-import { TrendingUp, Calendar, IndianRupee, Award } from "lucide-react"
+import { TrendingUp, Calendar, IndianRupee, Award, Briefcase } from "lucide-react"
+import { EmptyState, SkeletonBlock } from "@/components/ui/states"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,12 +62,12 @@ function StatPill({
 }) {
   return (
     <div className="flex items-center gap-3 bg-muted/50 border rounded-xl px-4 py-3 min-w-0">
-      <div className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${accent ?? "bg-indigo-100"}`}>
+      <div className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${accent ?? "bg-info-subtle"}`}>
         {icon}
       </div>
       <div className="min-w-0">
         <div className="text-xs text-muted-foreground truncate">{label}</div>
-        <div className="font-semibold text-sm truncate">{value}</div>
+        <div className="font-semibold text-sm truncate tnum">{value}</div>
       </div>
     </div>
   )
@@ -109,7 +110,11 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
   }
 
   if (dimensions.width === 0) {
-    return <div ref={containerRef} className="h-[240px] flex items-center justify-center text-sm text-muted-foreground">Loading…</div>
+    return (
+      <div ref={containerRef} className="w-full">
+        <SkeletonBlock className="h-[240px] w-full rounded-xl" />
+      </div>
+    )
   }
 
   return (
@@ -117,7 +122,7 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
       <svg
         width={dimensions.width}
         height={chartH}
-        className="w-full bg-gray-50 dark:bg-gray-900 rounded-xl overflow-visible"
+        className="w-full bg-chart-surface rounded-xl overflow-visible"
         onMouseLeave={() => setTooltip(null)}
       >
         {/* Grid + Y axis */}
@@ -126,9 +131,9 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
           return (
             <g key={i}>
               <line x1={padding.left} y1={y} x2={dimensions.width - padding.right} y2={y}
-                stroke="#e5e7eb" strokeWidth="0.5" className="dark:stroke-gray-700" />
+                stroke="hsl(var(--chart-grid))" strokeWidth="0.5" />
               <text x={padding.left - 8} y={y + 4} textAnchor="end"
-                className="fill-gray-400 dark:fill-gray-500" fontSize="9.5">
+                className="fill-muted-foreground tnum" fontSize="9.5">
                 {fmtAxis(tick)}
               </text>
             </g>
@@ -150,7 +155,7 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
                 <rect
                   x={barX} y={barY} width={barW} height={barH}
                   rx="3" ry="3"
-                  fill="#6366f1"
+                  fill="hsl(var(--chart-1))"
                   opacity={highlighted ? 1 : 0.78}
                   className="transition-opacity duration-100 cursor-pointer"
                   onMouseMove={(e) => handleMove(e, item)}
@@ -160,7 +165,7 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
                 <rect
                   x={barX + barW * 0.25} y={padding.top + areaH - 3}
                   width={barW * 0.5} height={3}
-                  rx="2" fill="#e5e7eb" className="dark:fill-gray-700"
+                  rx="2" fill="hsl(var(--chart-grid))"
                 />
               )}
 
@@ -169,8 +174,8 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
                 x={labelX} y={chartH - padding.bottom + 14}
                 textAnchor="middle" fontSize="9.5"
                 className={active
-                  ? "fill-gray-700 dark:fill-gray-300 font-medium"
-                  : "fill-gray-400 dark:fill-gray-600"
+                  ? "fill-foreground font-medium"
+                  : "fill-muted-foreground"
                 }
               >
                 {item.month}
@@ -180,7 +185,7 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
                 <text
                   x={labelX} y={chartH - padding.bottom + 26}
                   textAnchor="middle" fontSize="8"
-                  className="fill-gray-400 dark:fill-gray-600"
+                  className="fill-muted-foreground"
                 >
                   {item.year.slice(2)}
                 </text>
@@ -193,7 +198,7 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="absolute z-10 bg-gray-900 dark:bg-gray-800 text-white p-3 rounded-lg shadow-lg border border-gray-700 min-w-[160px] pointer-events-none"
+          className="absolute z-10 bg-popover text-popover-foreground p-3 rounded-lg shadow-md border min-w-[160px] pointer-events-none"
           style={{
             left: Math.min(tooltip.x + 12, dimensions.width - 180),
             top:  Math.max(tooltip.y - 16, 0),
@@ -201,12 +206,12 @@ function FreelancingBarChart({ timeline }: { timeline: FreelancingTrendItem[] })
         >
           <div className="font-semibold mb-1">{tooltip.label}</div>
           <div className="flex items-center gap-2 text-sm">
-            <div className="w-2.5 h-2.5 rounded-sm bg-indigo-400" />
-            <span className="text-gray-300">Freelancing</span>
-            <span className="font-medium ml-auto">{fmt(tooltip.amount)}</span>
+            <div className="w-2.5 h-2.5 rounded-sm bg-chart-1" />
+            <span className="text-muted-foreground">Freelancing</span>
+            <span className="font-medium ml-auto tnum">{fmt(tooltip.amount)}</span>
           </div>
           {tooltip.count > 1 && (
-            <div className="text-xs text-gray-400 mt-1">{tooltip.count} transactions</div>
+            <div className="text-xs text-muted-foreground mt-1">{tooltip.count} transactions</div>
           )}
         </div>
       )}
@@ -259,10 +264,10 @@ export default function FreelancingAnalytics({ ownerType }: FreelancingAnalytics
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-16 rounded-xl bg-muted/60 animate-pulse" />
+              <SkeletonBlock key={i} className="h-16 rounded-xl" />
             ))}
           </div>
-          <div className="h-[240px] rounded-xl bg-muted/60 animate-pulse" />
+          <SkeletonBlock className="h-[240px] rounded-xl" />
         </CardContent>
       </Card>
     )
@@ -307,35 +312,37 @@ export default function FreelancingAnalytics({ ownerType }: FreelancingAnalytics
         {/* Stat pills */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatPill
-            icon={<IndianRupee className="h-4 w-4 text-indigo-600" />}
+            icon={<IndianRupee className="h-4 w-4 text-info-text" />}
             label="Total Earned"
             value={fmt(data.totalEarned)}
-            accent="bg-indigo-100 dark:bg-indigo-900/40"
+            accent="bg-info-subtle"
           />
           <StatPill
-            icon={<Calendar className="h-4 w-4 text-violet-600" />}
+            icon={<Calendar className="h-4 w-4 text-info-text" />}
             label="Active Months"
             value={`${data.activeMonths} month${data.activeMonths !== 1 ? "s" : ""}`}
-            accent="bg-violet-100 dark:bg-violet-900/40"
+            accent="bg-info-subtle"
           />
           <StatPill
-            icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
+            icon={<TrendingUp className="h-4 w-4 text-success-text" />}
             label="Avg / Active Month"
             value={data.avgPerActiveMonth > 0 ? fmt(data.avgPerActiveMonth) : "—"}
-            accent="bg-emerald-100 dark:bg-emerald-900/40"
+            accent="bg-success-subtle"
           />
           <StatPill
-            icon={<Award className="h-4 w-4 text-amber-600" />}
+            icon={<Award className="h-4 w-4 text-warning-text" />}
             label="Best Month"
             value={data.bestMonth ? `${data.bestMonth.month} ${data.bestMonth.year}` : "—"}
-            accent="bg-amber-100 dark:bg-amber-900/40"
+            accent="bg-warning-subtle"
           />
         </div>
 
         {!hasData ? (
-          <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-            No freelancing income recorded yet
-          </div>
+          <EmptyState
+            icon={Briefcase}
+            title="No freelancing income yet"
+            description="Once a transaction is categorised as freelancing income it will show up here with monthly trends."
+          />
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_220px]">
             {/* Bar chart */}
@@ -357,14 +364,14 @@ export default function FreelancingAnalytics({ ownerType }: FreelancingAnalytics
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">
                           <span className="text-xs font-medium truncate">{m.label}</span>
-                          <span className="text-xs tabular-nums text-indigo-600 dark:text-indigo-400 font-semibold ml-2 shrink-0">
+                          <span className="text-xs tnum text-info-text font-semibold ml-2 shrink-0">
                             {fmt(m.amount)}
                           </span>
                         </div>
                         {/* Progress bar */}
                         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                            className="h-full bg-info rounded-full transition-all duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>

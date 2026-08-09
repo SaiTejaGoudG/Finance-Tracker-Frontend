@@ -467,7 +467,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-black text-white hover:bg-gray-800">
+        <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">
           {editTransaction ? "Save Changes" : "Create"}
         </Button>
       </div>

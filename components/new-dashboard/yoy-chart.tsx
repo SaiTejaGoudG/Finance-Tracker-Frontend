@@ -59,8 +59,8 @@ export default function YoYChart({ filters, className }: YoYChartProps) {
         </div>
         {data?.summary && (
           <div className="text-right text-xs text-muted-foreground space-y-0.5">
-            <p>{thisYear} income: <span className="font-semibold text-emerald-600">₹{(data.summary.thisYear.income / 100000).toFixed(1)}L</span></p>
-            <p>{lastYear} income: <span className="font-semibold text-emerald-500/70">₹{(data.summary.lastYear.income / 100000).toFixed(1)}L</span></p>
+            <p>{thisYear} income: <span className="font-semibold text-success-text">₹{(data.summary.thisYear.income / 100000).toFixed(1)}L</span></p>
+            <p>{lastYear} income: <span className="font-semibold text-success-text/70">₹{(data.summary.lastYear.income / 100000).toFixed(1)}L</span></p>
           </div>
         )}
       </div>
@@ -75,15 +75,15 @@ export default function YoYChart({ filters, className }: YoYChartProps) {
         <div className="h-[260px] px-2 pb-4">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data?.data ?? []} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barSize={8}>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={44} />
               <Tooltip content={<CustomTooltip />} />
               <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-              <Bar dataKey={`${thisYear}_income`}  name={`${thisYear} Income`}  fill="#10b981" radius={[2,2,0,0]} />
-              <Bar dataKey={`${lastYear}_income`}  name={`${lastYear} Income`}  fill="#10b98166" radius={[2,2,0,0]} />
-              <Bar dataKey={`${thisYear}_expense`} name={`${thisYear} Expense`} fill="#f43f5e" radius={[2,2,0,0]} />
-              <Bar dataKey={`${lastYear}_expense`} name={`${lastYear} Expense`} fill="#f43f5e66" radius={[2,2,0,0]} />
+              <Bar dataKey={`${thisYear}_income`}  name={`${thisYear} Income`}  fill="hsl(var(--chart-3))" radius={[2,2,0,0]} />
+              <Bar dataKey={`${lastYear}_income`}  name={`${lastYear} Income`}  fill="hsl(var(--chart-3) / 0.4)" radius={[2,2,0,0]} />
+              <Bar dataKey={`${thisYear}_expense`} name={`${thisYear} Expense`} fill="hsl(var(--chart-4))" radius={[2,2,0,0]} />
+              <Bar dataKey={`${lastYear}_expense`} name={`${lastYear} Expense`} fill="hsl(var(--chart-4) / 0.4)" radius={[2,2,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

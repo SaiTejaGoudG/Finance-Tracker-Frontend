@@ -17,7 +17,8 @@ import { apiUrl } from "@/lib/api"
 // writes to once it mounts.
 let _getToken: (() => string | null) | null = null
 let _refreshToken: (() => Promise<string | null>) | null = null
-let _forceLogout: (() => void) | null = null
+// Accepts an optional reason, surfaced as a banner on /login (e.g. "session_expired")
+let _forceLogout: ((reason?: string) => void) | null = null
 
 /**
  * Called by AuthProvider on mount to register the token accessors.

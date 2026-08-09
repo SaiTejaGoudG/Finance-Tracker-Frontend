@@ -120,7 +120,7 @@ export default function CreditCardForm({ onSubmit, onCancel, editCard }: CreditC
       </div>
 
       <div className="flex gap-2 pt-4">
-        <Button type="submit" className="flex-1 bg-black hover:bg-gray-800 text-white">
+        <Button type="submit" className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
           {editCard ? "Update" : "Add"} Card
         </Button>
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1 bg-transparent">

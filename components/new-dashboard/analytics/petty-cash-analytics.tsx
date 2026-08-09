@@ -7,10 +7,26 @@ import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
 import type { OverviewFilters } from "../use-overview-data"
 
-const CAT_COLORS  = ["#7c3aed","#a78bfa","#6366f1","#8b5cf6","#c4b5fd","#ddd6fe","#4f46e5","#818cf8"]
-const OWN_COLORS  = ["#f59e0b","#10b981","#3b82f6","#f43f5e"]
+const CAT_COLORS  = [
+  "hsl(var(--chart-1))","hsl(var(--chart-2))","hsl(var(--chart-3))","hsl(var(--chart-4))",
+  "hsl(var(--chart-5))","hsl(var(--chart-6))","hsl(var(--chart-7))","hsl(var(--chart-8))",
+]
+const OWN_COLORS  = ["hsl(var(--chart-1))","hsl(var(--chart-2))","hsl(var(--chart-3))","hsl(var(--chart-4))"]
 const fmtINR      = (v: number) => `₹${v.toLocaleString("en-IN")}`
 const fmtY        = (v: number) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : v >= 1000 ? `₹${(v/1000).toFixed(0)}K` : `₹${v}`
+
+function PettyCashTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-popover text-popover-foreground border rounded-lg shadow-md p-2.5 text-xs">
+      {label !== undefined && <p className="font-semibold mb-1">{label}</p>}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted-foreground">Petty Cash</span>
+        <span className="font-medium tabular-nums">{fmtINR(payload[0].value as number)}</span>
+      </div>
+    </div>
+  )
+}
 
 export default function PettyCashAnalytics({ filters }: { filters: OverviewFilters }) {
   const [data, setData]       = useState<any>(null)
@@ -34,7 +50,7 @@ export default function PettyCashAnalytics({ filters }: { filters: OverviewFilte
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: "Total Petty Cash", value: fmtINR(data.total),       color: "text-violet-600" },
+          { label: "Total Petty Cash", value: fmtINR(data.total),       color: "text-info-text" },
           { label: "Avg / Month",      value: fmtINR(data.avgPerMonth),  color: "text-foreground" },
           { label: "Transactions",     value: `${data.txnCount}`,        color: "text-foreground" },
         ].map(s => (
@@ -53,15 +69,15 @@ export default function PettyCashAnalytics({ filters }: { filters: OverviewFilte
             <AreaChart data={data.monthlyTrend} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="gradPC" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.02} />
+                  <stop offset="5%" stopColor="hsl(var(--chart-6))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--chart-6))" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
-              <Tooltip formatter={(v: any) => [fmtINR(v), "Petty Cash"]} />
-              <Area type="monotone" dataKey="amount" stroke="#7c3aed" strokeWidth={2} fill="url(#gradPC)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={44} />
+              <Tooltip content={<PettyCashTooltip />} />
+              <Area type="monotone" dataKey="amount" stroke="hsl(var(--chart-6))" strokeWidth={2} fill="url(#gradPC)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -98,10 +114,10 @@ export default function PettyCashAnalytics({ filters }: { filters: OverviewFilte
             <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.byOwner} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} horizontal={false} />
-                  <XAxis type="number" tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="owner" tick={{ fontSize: 11, fill: "currentColor" }} axisLine={false} tickLine={false} width={52} />
-                  <Tooltip formatter={(v: any) => [fmtINR(v), "Petty Cash"]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" horizontal={false} />
+                  <XAxis type="number" tickFormatter={fmtY} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="owner" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={52} />
+                  <Tooltip content={<PettyCashTooltip />} />
                   <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                     {data.byOwner.map((_: any, i: number) => (
                       <rect key={i} fill={OWN_COLORS[i % OWN_COLORS.length]} />

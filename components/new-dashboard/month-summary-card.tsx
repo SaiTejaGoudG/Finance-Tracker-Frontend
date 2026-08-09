@@ -6,6 +6,7 @@ import { FileText, Sparkles, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
+import { SkeletonText } from "@/components/ui/states"
 import type { OverviewFilters } from "./use-overview-data"
 
 interface MonthSummaryCardProps { filters: OverviewFilters; className?: string }
@@ -44,8 +45,8 @@ export default function MonthSummaryCard({ filters, className }: MonthSummaryCar
   return (
     <div className={cn("rounded-2xl border bg-card shadow-sm p-5 space-y-4", className)}>
       <div className="flex items-center gap-2">
-        <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40">
-          <FileText className="h-4 w-4 text-amber-600" />
+        <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-warning-subtle">
+          <FileText className="h-4 w-4 text-warning-subtle-foreground" />
         </div>
         <div>
           <h3 className="text-sm font-semibold">Month-close Summary</h3>
@@ -70,7 +71,7 @@ export default function MonthSummaryCard({ filters, className }: MonthSummaryCar
                 onClick={() => { setMonth(m.value); setOpen(false); setSummary(null) }}
                 className={cn(
                   "w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors",
-                  month === m.value && "font-medium text-violet-600"
+                  month === m.value && "font-medium text-info-text"
                 )}
               >
                 {m.label}
@@ -83,23 +84,17 @@ export default function MonthSummaryCard({ filters, className }: MonthSummaryCar
       <button
         onClick={generate}
         disabled={loading}
-        className="flex items-center justify-center gap-2 w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-2.5 transition-colors disabled:opacity-50"
+        className="flex items-center justify-center gap-2 w-full rounded-xl bg-warning hover:bg-warning/90 text-warning-foreground text-sm font-medium py-2.5 transition-colors disabled:opacity-50"
       >
         <Sparkles className="h-4 w-4" />
         {loading ? "Generating…" : "Generate Summary"}
       </button>
 
-      {loading && (
-        <div className="space-y-2">
-          {[100, 85, 70, 55].map((w, i) => (
-            <div key={i} className="h-3 rounded-full bg-muted animate-pulse" style={{ width: `${w}%` }} />
-          ))}
-        </div>
-      )}
+      {loading && <SkeletonText lines={4} />}
 
       {summary && (
-        <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-4">
-          <p className="text-sm text-foreground/90 leading-relaxed">{summary}</p>
+        <div className="rounded-xl bg-warning-subtle border border-warning/25 p-4">
+          <p className="text-sm text-warning-subtle-foreground leading-relaxed">{summary}</p>
         </div>
       )}
     </div>
