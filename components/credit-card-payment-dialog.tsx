@@ -2,6 +2,7 @@
 
 import { apiUrl } from "@/lib/api"
 import { apiClient } from "@/lib/apiClient"
+import { toTransactionId, SYNTHETIC_ROW_MESSAGE } from "@/lib/tx-id"
 import { Separator } from "@/components/ui/separator"
 
 import { useState } from "react"
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import StatusBadge from "@/components/status-badge"
 import { FileText, DollarSign, Clock, Loader2 } from "lucide-react"
 import type { Transaction } from "./dashboard"
+import { useToast } from "@/components/ui/use-toast"
 
 type CreditCardPaymentDialogProps = {
   transaction: Transaction | null
@@ -26,6 +28,7 @@ export default function CreditCardPaymentDialog({
   onOpenChange,
   onPaymentComplete,
 }: CreditCardPaymentDialogProps) {
+  const { toast } = useToast()
   const [paymentDate, setPaymentDate] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -42,8 +45,18 @@ export default function CreditCardPaymentDialog({
 
     setLoading(true)
     try {
-      const paymentId = transaction.payment_id || Number.parseInt(transaction.id)
-      console.log("[v0] Making payment with ID:", paymentId)
+      // payment_id is the real target; the id fallback must still be validated,
+      // since a synthetic row would give NaN -> serialised as null -> 400.
+      const paymentId = transaction.payment_id ?? toTransactionId(transaction.id)
+      if (paymentId === null) {
+        toast({
+          title: "Can't record this payment",
+          description: SYNTHETIC_ROW_MESSAGE,
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
+      }
 
       const res = await apiClient(
         apiUrl("transaction/payments/update-status"),
@@ -73,7 +86,16 @@ export default function CreditCardPaymentDialog({
   const handleRevertPayment = async () => {
     setLoading(true)
     try {
-      const paymentId = transaction.payment_id || Number.parseInt(transaction.id)
+      const paymentId = transaction.payment_id ?? toTransactionId(transaction.id)
+      if (paymentId === null) {
+        toast({
+          title: "Can't revoke this payment",
+          description: SYNTHETIC_ROW_MESSAGE,
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
+      }
       console.log("[v0] Reverting payment with ID:", paymentId)
 
       const res = await apiClient(
@@ -123,7 +145,7 @@ export default function CreditCardPaymentDialog({
               <DollarSign className="h-4 w-4 text-muted-foreground" />
               <div>
                 <div className="font-medium">Amount</div>
-                <div className="text-sm font-semibold text-red-600">₹{transaction.amount.toFixed(2)}</div>
+                <div className="text-sm font-semibold tnum text-destructive-text">₹{transaction.amount.toFixed(2)}</div>
               </div>
             </div>
 
@@ -171,8 +193,8 @@ export default function CreditCardPaymentDialog({
 
           {isPaid && (
             <div className="space-y-4">
-              <div className="bg-green-50 p-3 rounded-md">
-                <p className="text-sm text-green-800">Payment completed successfully</p>
+              <div className="rounded-md border border-success/25 bg-success-subtle p-3">
+                <p className="text-sm text-success-subtle-foreground">Payment completed successfully</p>
               </div>
 
               <div className="flex gap-2">
@@ -180,7 +202,7 @@ export default function CreditCardPaymentDialog({
                   onClick={handleRevertPayment}
                   disabled={loading}
                   variant="outline"
-                  className="flex-1 text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
+                  className="flex-1 border-destructive/25 bg-transparent text-destructive-text hover:bg-destructive-subtle"
                 >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Revert Payment

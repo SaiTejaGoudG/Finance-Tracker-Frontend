@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlertTriangle, X, ChevronDown, ChevronUp } from "lucide-react"
+import { AlertTriangle, X, ChevronDown, ChevronUp, PartyPopper } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { EmptyState, SkeletonText } from "@/components/ui/states"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
 import type { OverviewFilters } from "./use-overview-data"
@@ -22,15 +23,15 @@ interface AnomalyBannerProps {
 }
 
 const severityStyle = {
-  high:   "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30",
-  medium: "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30",
-  low:    "border-yellow-200 bg-yellow-50 dark:border-yellow-900/50 dark:bg-yellow-950/30",
+  high:   "border-destructive/25 bg-destructive-subtle",
+  medium: "border-warning/25 bg-warning-subtle",
+  low:    "border-warning/25 bg-warning-subtle",
 }
 
 const severityIcon = {
-  high:   "text-red-500",
-  medium: "text-amber-500",
-  low:    "text-yellow-500",
+  high:   "text-destructive-subtle-foreground",
+  medium: "text-warning-subtle-foreground",
+  low:    "text-warning-subtle-foreground",
 }
 
 function fmtINR(v: number) {
@@ -61,12 +62,15 @@ export default function AnomalyBanner({ filters, className }: AnomalyBannerProps
 
   const visible = anomalies.filter((a) => !dismissed.has(`${a.category}-${a.month}`))
 
-  if (loading) return (
-    <p className="text-sm text-muted-foreground">Analysing spending patterns…</p>
-  )
+  if (loading) return <SkeletonText lines={2} />
 
   if (visible.length === 0) return (
-    <p className="text-sm text-muted-foreground">No spending spikes detected in this period. 🎉</p>
+    <EmptyState
+      compact
+      icon={PartyPopper}
+      title="No spending spikes"
+      description="Nothing exceeded its usual range in this period."
+    />
   )
 
   const shown = expanded ? visible : visible.slice(0, 2)
@@ -102,9 +106,9 @@ export default function AnomalyBanner({ filters, className }: AnomalyBannerProps
                 <span className="text-muted-foreground"> in </span>
                 <span className="font-semibold">{a.month}</span>
                 <span className="text-muted-foreground"> was </span>
-                <span className="font-semibold">{fmtINR(a.amount)}</span>
+                <span className="font-semibold tnum">{fmtINR(a.amount)}</span>
                 <span className="text-muted-foreground"> — </span>
-                <span className="font-medium text-foreground">{a.ratio}× your average of {fmtINR(a.average)}</span>
+                <span className="font-medium text-foreground tnum">{a.ratio}× your average of {fmtINR(a.average)}</span>
               </div>
             </div>
             <button

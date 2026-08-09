@@ -5,8 +5,9 @@ import { apiClient } from "@/lib/apiClient"
 import { useAuth } from "@/context/AuthContext"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 
+import type React from "react"
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,6 +18,67 @@ import { Plus, CreditCardIcon, Bell, User } from "lucide-react"
 import LayoutWrapper from "@/components/layout-wrapper"
 import { useToast } from "@/components/ui/use-toast"
 import CreditCardsTable from "@/components/credit-cards-table"
+import { SkeletonRows, EmptyState } from "@/components/ui/states"
+import { cn } from "@/lib/utils"
+
+/**
+ * Settings pages read best as a stack of labelled sections: a short heading,
+ * one line explaining what the group controls, then the fields. Sections are
+ * separated by a hairline (the parent supplies `divide-y`) instead of being
+ * dumped into one flat form.
+ */
+function SettingsSection({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string
+  description: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <section className={cn("px-5 py-5", className)}>
+      <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+      <div className="mt-4">{children}</div>
+    </section>
+  )
+}
+
+/** Label + description on the left, switch right-aligned. */
+function ToggleRow({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id: string
+  label: string
+  description: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="flex items-start justify-between gap-6 py-3 first:pt-0 last:pb-0">
+      <div className="space-y-0.5">
+        <Label htmlFor={id} className="text-sm font-medium text-foreground">
+          {label}
+        </Label>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} className="mt-0.5 shrink-0" />
+    </div>
+  )
+}
+
+const TAB_TRIGGER_CLASS = cn(
+  "relative rounded-none border-b-2 border-transparent bg-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground shadow-none transition-colors",
+  "hover:text-foreground",
+  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none",
+)
 
 interface CreditCardType {
   id: number
@@ -345,30 +407,51 @@ function ConfigurationsPageContent() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto w-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Configurations</h1>
+    <div className="space-y-6 3xl:max-w-7xl 3xl:mx-auto w-full">
+      {/* Page header */}
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Configurations</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Your profile, how you get notified, and the cards you track spending against.
+        </p>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="credit-cards">Credit Cards</TabsTrigger>
+        {/* Settings tabs — underline style, sized to content rather than three
+            stretched full-width segments */}
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+          {(
+            [
+              ["profile", "Profile"],
+              ["notifications", "Notifications"],
+              ["credit-cards", "Credit Cards"],
+            ] as const
+          ).map(([value, label]) => (
+            <TabsTrigger key={value} value={value} className={TAB_TRIGGER_CLASS}>
+              {label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="credit-cards" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCardIcon className="h-5 w-5" />
-                    Credit Cards Management
-                  </CardTitle>
-                  <CardDescription>Manage your credit and debit cards for transaction tracking</CardDescription>
-                </div>
-                <Dialog
+        <TabsContent value="credit-cards" className="mt-4">
+          <Card className="overflow-hidden">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
+                  <CreditCardIcon className="h-4 w-4 text-muted-foreground" />
+                  Credit cards
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Cards available when logging transactions
+                  {creditCards.length > 0 && (
+                    <>
+                      {" · "}
+                      <span className="tnum font-medium text-foreground">{creditCards.length}</span> saved
+                    </>
+                  )}
+                </p>
+              </div>
+              <Dialog
                   open={showAddCard}
                   onOpenChange={(open) => {
                     if (!open) {
@@ -476,129 +559,141 @@ function ConfigurationsPageContent() {
                   </DialogContent>
                 </Dialog>
               </div>
-            </CardHeader>
-            <CardContent>
-              <CreditCardsTable creditCards={creditCards} onEdit={handleEditCard} onDelete={handleDeleteCard} />
-            </CardContent>
+
+            {isLoading ? (
+              <SkeletonRows rows={3} columns={5} />
+            ) : creditCards.length === 0 ? (
+              <EmptyState
+                icon={CreditCardIcon}
+                title="No cards yet"
+                description="Add a credit card to start attributing transactions to it."
+                action={
+                  <Button size="sm" onClick={() => setShowAddCard(true)}>
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    Add card
+                  </Button>
+                }
+              />
+            ) : (
+              <CreditCardsTable
+                creditCards={creditCards}
+                onEdit={handleEditCard}
+                onDelete={handleDeleteCard}
+              />
+            )}
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notification Settings
-              </CardTitle>
-              <CardDescription>Configure how you want to receive notifications and reports</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Communication Preferences</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Email Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Receive notifications via email</p>
-                    </div>
-                    <Switch
-                      checked={notifications.emailNotifications}
-                      onCheckedChange={(checked) => handleNotificationChange("emailNotifications", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>SMS Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Receive notifications via SMS</p>
-                    </div>
-                    <Switch
-                      checked={notifications.smsNotifications}
-                      onCheckedChange={(checked) => handleNotificationChange("smsNotifications", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Push Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Receive push notifications in browser</p>
-                    </div>
-                    <Switch
-                      checked={notifications.pushNotifications}
-                      onCheckedChange={(checked) => handleNotificationChange("pushNotifications", checked)}
-                    />
-                  </div>
-                </div>
-              </div>
+        <TabsContent value="notifications" className="mt-4">
+          <Card className="max-w-2xl divide-y overflow-hidden">
+            <div className="px-5 py-4">
+              <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
+                <Bell className="h-4 w-4 text-muted-foreground" />
+                Notifications
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Choose how and when Finance Tracker reaches you.
+              </p>
+            </div>
 
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Reports & Alerts</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Weekly Reports</Label>
-                      <p className="text-sm text-muted-foreground">Get weekly spending summaries</p>
-                    </div>
-                    <Switch
-                      checked={notifications.weeklyReports}
-                      onCheckedChange={(checked) => handleNotificationChange("weeklyReports", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Monthly Reports</Label>
-                      <p className="text-sm text-muted-foreground">Get monthly financial reports</p>
-                    </div>
-                    <Switch
-                      checked={notifications.monthlyReports}
-                      onCheckedChange={(checked) => handleNotificationChange("monthlyReports", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Budget Alerts</Label>
-                      <p className="text-sm text-muted-foreground">Get alerts when approaching budget limits</p>
-                    </div>
-                    <Switch
-                      checked={notifications.budgetAlerts}
-                      onCheckedChange={(checked) => handleNotificationChange("budgetAlerts", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Payment Reminders</Label>
-                      <p className="text-sm text-muted-foreground">Get reminders for upcoming payments</p>
-                    </div>
-                    <Switch
-                      checked={notifications.paymentReminders}
-                      onCheckedChange={(checked) => handleNotificationChange("paymentReminders", checked)}
-                    />
-                  </div>
-                </div>
+            <SettingsSection
+              title="Communication preferences"
+              description="Where notifications are delivered."
+            >
+              <div className="divide-y">
+                <ToggleRow
+                  id="email-notifications"
+                  label="Email"
+                  description="Receive notifications by email"
+                  checked={notifications.emailNotifications}
+                  onCheckedChange={(checked) => handleNotificationChange("emailNotifications", checked)}
+                />
+                <ToggleRow
+                  id="sms-notifications"
+                  label="SMS"
+                  description="Receive notifications by text message"
+                  checked={notifications.smsNotifications}
+                  onCheckedChange={(checked) => handleNotificationChange("smsNotifications", checked)}
+                />
+                <ToggleRow
+                  id="push-notifications"
+                  label="Push"
+                  description="Receive notifications in the browser"
+                  checked={notifications.pushNotifications}
+                  onCheckedChange={(checked) => handleNotificationChange("pushNotifications", checked)}
+                />
               </div>
-            </CardContent>
+            </SettingsSection>
+
+            <SettingsSection
+              title="Reports and alerts"
+              description="Recurring summaries and threshold warnings."
+            >
+              <div className="divide-y">
+                <ToggleRow
+                  id="weekly-reports"
+                  label="Weekly reports"
+                  description="A spending summary every week"
+                  checked={notifications.weeklyReports}
+                  onCheckedChange={(checked) => handleNotificationChange("weeklyReports", checked)}
+                />
+                <ToggleRow
+                  id="monthly-reports"
+                  label="Monthly reports"
+                  description="A full financial report each month"
+                  checked={notifications.monthlyReports}
+                  onCheckedChange={(checked) => handleNotificationChange("monthlyReports", checked)}
+                />
+                <ToggleRow
+                  id="budget-alerts"
+                  label="Budget alerts"
+                  description="Warn me as I approach a budget limit"
+                  checked={notifications.budgetAlerts}
+                  onCheckedChange={(checked) => handleNotificationChange("budgetAlerts", checked)}
+                />
+                <ToggleRow
+                  id="payment-reminders"
+                  label="Payment reminders"
+                  description="Remind me before a payment falls due"
+                  checked={notifications.paymentReminders}
+                  onCheckedChange={(checked) => handleNotificationChange("paymentReminders", checked)}
+                />
+              </div>
+            </SettingsSection>
           </Card>
         </TabsContent>
 
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Profile Settings
-              </CardTitle>
-              <CardDescription>Manage your personal information and preferences</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+        <TabsContent value="profile" className="mt-4">
+          <Card className="max-w-2xl divide-y overflow-hidden">
+            <div className="px-5 py-4">
+              <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
+                <User className="h-4 w-4 text-muted-foreground" />
+                Profile
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Your details and how figures are formatted across the app.
+              </p>
+            </div>
+
+            <SettingsSection
+              title="Personal details"
+              description="How you're identified in the app."
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="text-xs font-medium">
+                    Full name
+                  </Label>
                   <Input
                     id="name"
                     value={profile.name}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-medium">
+                    Email address
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -606,16 +701,26 @@ function ConfigurationsPageContent() {
                     onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="phone" className="text-xs font-medium">
+                    Phone number
+                  </Label>
                   <Input
                     id="phone"
                     value={profile.phone}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Currency</Label>
+              </div>
+            </SettingsSection>
+
+            <SettingsSection
+              title="Regional format"
+              description="Applies to every amount and date shown across the app."
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Currency</Label>
                   <SearchableSelect
                     value={profile.currency}
                     onValueChange={(value) => setProfile({ ...profile, currency: value })}
@@ -629,8 +734,8 @@ function ConfigurationsPageContent() {
                     ]}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Timezone</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Timezone</Label>
                   <SearchableSelect
                     value={profile.timezone}
                     onValueChange={(value) => setProfile({ ...profile, timezone: value })}
@@ -644,8 +749,8 @@ function ConfigurationsPageContent() {
                     ]}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Date Format</Label>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs font-medium">Date format</Label>
                   <SearchableSelect
                     value={profile.dateFormat}
                     onValueChange={(value) => setProfile({ ...profile, dateFormat: value })}
@@ -659,10 +764,13 @@ function ConfigurationsPageContent() {
                   />
                 </div>
               </div>
-              <div className="flex justify-end">
-                <Button onClick={handleProfileUpdate}>Update Profile</Button>
-              </div>
-            </CardContent>
+            </SettingsSection>
+
+            <div className="flex justify-end px-5 py-4">
+              <Button onClick={handleProfileUpdate} size="sm">
+                Save changes
+              </Button>
+            </div>
           </Card>
         </TabsContent>
       </Tabs>

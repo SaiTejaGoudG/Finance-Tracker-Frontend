@@ -18,8 +18,8 @@ import type { CreditCardData, CreditCardItem } from "./use-overview-data"
 // ─── Palette (one colour per card, consistent) ────────────────────────────────
 
 const CARD_COLORS = [
-  "#6366f1", "#f59e0b", "#10b981", "#f43f5e",
-  "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6",
+  "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))", "hsl(var(--chart-6))", "hsl(var(--chart-7))", "hsl(var(--chart-8))",
 ]
 function cardColor(idx: number) { return CARD_COLORS[idx % CARD_COLORS.length] }
 
@@ -185,14 +185,14 @@ export default function CreditCardAnalytics({ data, loading, className }: Credit
   // Derived values for single-card view
   const selectedCard    = data?.cards.find((c) => c.card_id === selectedCardId) ?? null
   const selectedCardIdx = data?.cards.findIndex((c) => c.card_id === selectedCardId) ?? -1
-  const selectedColor   = selectedCardIdx >= 0 ? cardColor(selectedCardIdx) : "#6366f1"
+  const selectedColor   = selectedCardIdx >= 0 ? cardColor(selectedCardIdx) : "hsl(var(--chart-1))"
 
   return (
     <div className={cn("rounded-2xl border bg-card shadow-sm", className)}>
       {/* Header */}
       <div className="px-5 pt-5 pb-4 flex items-center gap-3 border-b">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 shrink-0">
-          <CreditCard className="h-4 w-4 text-indigo-600" />
+        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-info-subtle shrink-0">
+          <CreditCard className="h-4 w-4 text-info-text" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">Credit Card Spend</h3>
@@ -211,18 +211,18 @@ export default function CreditCardAnalytics({ data, loading, className }: Credit
         <div className="p-5 space-y-6">
 
           {/* ── 1. Summary pill ───────────────────────────────────────────── */}
-          <div className="flex items-center justify-between rounded-xl bg-indigo-50 dark:bg-indigo-900/20 px-5 py-4">
+          <div className="flex items-center justify-between rounded-xl bg-info-subtle px-5 py-4">
             <div>
-              <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+              <p className="text-xs font-medium text-info-subtle-foreground uppercase tracking-wider">
                 Total Credit Card Spend
               </p>
-              <p className="text-2xl font-bold tabular-nums text-indigo-700 dark:text-indigo-300 mt-0.5">
+              <p className="text-2xl font-bold tabular-nums text-info-subtle-foreground mt-0.5">
                 {fmtFull(data!.total)}
               </p>
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Cards used</p>
-              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data!.cards.length}</p>
+              <p className="text-2xl font-bold text-info-subtle-foreground">{data!.cards.length}</p>
             </div>
           </div>
 
@@ -271,7 +271,7 @@ export default function CreditCardAnalytics({ data, loading, className }: Credit
                       className={cn(
                         "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
                         selectedCardId === card.card_id
-                          ? "text-white border-transparent"
+                          ? "text-info-foreground border-transparent"
                           : "bg-background text-muted-foreground border-border hover:border-foreground/40",
                       )}
                       style={
@@ -296,20 +296,19 @@ export default function CreditCardAnalytics({ data, loading, className }: Credit
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="currentColor"
-                      strokeOpacity={0.06}
+                      stroke="hsl(var(--chart-grid))"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="label"
-                      tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={false}
                       tickLine={false}
                       interval="preserveStartEnd"
                     />
                     <YAxis
                       tickFormatter={fmtINR}
-                      tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={false}
                       tickLine={false}
                       width={44}

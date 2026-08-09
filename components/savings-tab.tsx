@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Plus, Wallet, TrendingUp, Target, PiggyBank } from "lucide-react"
+import { Plus, Wallet, TrendingUp, Target, PiggyBank, Receipt } from "lucide-react"
 import { format } from "date-fns"
+import { EmptyState } from "@/components/ui/states"
 
 interface SavingsAccount {
   id: string
@@ -151,6 +152,10 @@ export default function SavingsTab() {
   const activeAccounts = accounts.filter((account) => account.status === "Active").length
   const monthlyContributions = accounts.reduce((sum, account) => sum + (account.monthlyContribution || 0), 0)
 
+  const accountTransactions = transactions
+    .filter((transaction) => transaction.accountId === selectedAccount?.id)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
   const handleAddAccount = () => {
     const account: SavingsAccount = {
       id: (accounts.length + 1).toString(),
@@ -219,11 +224,11 @@ export default function SavingsTab() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Active":
-        return <Badge className="bg-green-100 text-green-800">Active</Badge>
+        return <Badge className="bg-success-subtle text-success-subtle-foreground">Active</Badge>
       case "Matured":
-        return <Badge className="bg-blue-100 text-blue-800">Matured</Badge>
+        return <Badge className="bg-info-subtle text-info-subtle-foreground">Matured</Badge>
       case "Closed":
-        return <Badge className="bg-gray-100 text-gray-800">Closed</Badge>
+        return <Badge className="bg-muted text-foreground">Closed</Badge>
       default:
         return <Badge>{status}</Badge>
     }
@@ -254,7 +259,7 @@ export default function SavingsTab() {
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">₹{totalSavings.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-success-text tnum">₹{totalSavings.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Across all accounts</p>
           </CardContent>
         </Card>
@@ -265,7 +270,7 @@ export default function SavingsTab() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">₹{totalTargets.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-info-text tnum">₹{totalTargets.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Combined savings goals</p>
           </CardContent>
         </Card>
@@ -276,7 +281,7 @@ export default function SavingsTab() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">₹{monthlyContributions.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-warning-text tnum">₹{monthlyContributions.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Regular savings</p>
           </CardContent>
         </Card>
@@ -287,7 +292,7 @@ export default function SavingsTab() {
             <PiggyBank className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{activeAccounts}</div>
+            <div className="text-2xl font-bold text-info-text tnum">{activeAccounts}</div>
             <p className="text-xs text-muted-foreground">Savings accounts</p>
           </CardContent>
         </Card>
@@ -408,6 +413,13 @@ export default function SavingsTab() {
           </div>
         </CardHeader>
         <CardContent>
+          {accounts.length === 0 ? (
+            <EmptyState
+              icon={PiggyBank}
+              title="No savings accounts yet"
+              description="Add a savings account, fixed deposit or emergency fund to start tracking progress towards your goals."
+            />
+          ) : (
           <div className="space-y-4">
             {accounts.map((account) => {
               const progressPercentage = account.targetAmount
@@ -435,21 +447,21 @@ export default function SavingsTab() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Current Balance</p>
-                      <p className="font-semibold text-green-600">₹{account.currentBalance.toLocaleString()}</p>
+                      <p className="font-semibold text-success-text tnum">₹{account.currentBalance.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Target Amount</p>
-                      <p className="font-semibold">
+                      <p className="font-semibold tnum">
                         {account.targetAmount ? `₹${account.targetAmount.toLocaleString()}` : "No target"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Interest Rate</p>
-                      <p className="font-semibold">{account.interestRate}% p.a.</p>
+                      <p className="font-semibold tnum">{account.interestRate}% p.a.</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Monthly Contribution</p>
-                      <p className="font-semibold">
+                      <p className="font-semibold tnum">
                         {account.monthlyContribution ? `₹${account.monthlyContribution.toLocaleString()}` : "None"}
                       </p>
                     </div>
@@ -459,7 +471,7 @@ export default function SavingsTab() {
                     <div className="space-y-2 mb-4">
                       <div className="flex justify-between text-sm">
                         <span>Progress to Goal</span>
-                        <span>{progressPercentage.toFixed(1)}%</span>
+                        <span className="tnum">{progressPercentage.toFixed(1)}%</span>
                       </div>
                       <Progress value={Math.min(progressPercentage, 100)} className="h-2" />
                     </div>
@@ -498,6 +510,7 @@ export default function SavingsTab() {
               )
             })}
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -519,32 +532,44 @@ export default function SavingsTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions
-                  .filter((transaction) => transaction.accountId === selectedAccount?.id)
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((transaction) => (
+                {accountTransactions.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="p-0">
+                      <EmptyState
+                        compact
+                        icon={Receipt}
+                        title="No transactions yet"
+                        description="Deposits, withdrawals and interest credits for this account will show up here."
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  accountTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>{format(new Date(transaction.date), "MMM dd, yyyy")}</TableCell>
                       <TableCell>
                         <Badge
                           className={
                             transaction.type === "Deposit"
-                              ? "bg-green-100 text-green-800"
+                              ? "bg-success-subtle text-success-subtle-foreground"
                               : transaction.type === "Withdrawal"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-blue-100 text-blue-800"
+                                ? "bg-destructive-subtle text-destructive-subtle-foreground"
+                                : "bg-info-subtle text-info-subtle-foreground"
                           }
                         >
                           {transaction.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className={transaction.type === "Deposit" ? "text-green-600" : "text-red-600"}>
+                      <TableCell
+                        className={`tnum ${transaction.type === "Deposit" ? "text-success-text" : "text-destructive-text"}`}
+                      >
                         {transaction.type === "Deposit" ? "+" : "-"}₹{transaction.amount.toLocaleString()}
                       </TableCell>
                       <TableCell>{transaction.description}</TableCell>
-                      <TableCell>₹{transaction.balance.toLocaleString()}</TableCell>
+                      <TableCell className="tnum">₹{transaction.balance.toLocaleString()}</TableCell>
                     </TableRow>
-                  ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

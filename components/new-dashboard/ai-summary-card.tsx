@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Sparkles, RefreshCw, AlertCircle } from "lucide-react"
+import { Sparkles, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
+import { ErrorBanner, SkeletonText } from "@/components/ui/states"
 import type { OverviewFilters } from "./use-overview-data"
 
 interface AISummaryCardProps {
@@ -49,16 +50,16 @@ export default function AISummaryCard({ filters, className }: AISummaryCardProps
 
   return (
     <div className={cn(
-      "rounded-2xl border bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 shadow-sm p-5",
+      "rounded-2xl border border-info/25 bg-info-subtle shadow-sm p-5",
       className
     )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/50 shrink-0">
-            <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-info/15 shrink-0">
+            <Sparkles className="h-4 w-4 text-info-subtle-foreground" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">AI Insight</p>
+            <p className="text-xs font-semibold text-info-subtle-foreground uppercase tracking-wider">AI Insight</p>
           </div>
         </div>
         <button
@@ -73,18 +74,11 @@ export default function AISummaryCard({ filters, className }: AISummaryCardProps
 
       <div className="mt-3">
         {loading ? (
-          <div className="space-y-2">
-            {[100, 85, 70].map((w, i) => (
-              <div key={i} className="h-3 rounded-full bg-violet-200/60 dark:bg-violet-800/40 animate-pulse" style={{ width: `${w}%` }} />
-            ))}
-          </div>
+          <SkeletonText lines={3} />
         ) : error ? (
-          <div className="flex items-center gap-2 text-sm text-red-500">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
+          <ErrorBanner message={error} onRetry={fetchSummary} />
         ) : summary ? (
-          <p className="text-sm text-foreground/90 leading-relaxed">{summary}</p>
+          <p className="text-sm text-info-subtle-foreground leading-relaxed">{summary}</p>
         ) : null}
       </div>
     </div>

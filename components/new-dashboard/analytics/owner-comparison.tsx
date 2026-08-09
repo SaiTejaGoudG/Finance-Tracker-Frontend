@@ -7,7 +7,7 @@ import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
 import type { OverviewFilters } from "../use-overview-data"
 
-const OWNER_COLORS = ["#6366f1","#10b981","#f59e0b","#f43f5e"]
+const OWNER_COLORS = ["hsl(var(--chart-1))","hsl(var(--chart-2))","hsl(var(--chart-3))","hsl(var(--chart-4))"]
 const fmtINR = (v: number) => `₹${v.toLocaleString("en-IN")}`
 const fmtY   = (v: number) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : v >= 1000 ? `₹${(v/1000).toFixed(0)}K` : `₹${v}`
 
@@ -62,9 +62,9 @@ export default function OwnerComparison({ filters }: { filters: OverviewFilters 
               <p className="text-sm font-semibold capitalize">{o.owner}</p>
             </div>
             <div className="space-y-1 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Income</span><span className="font-medium text-emerald-600">{fmtINR(o.income)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Expense</span><span className="font-medium text-rose-500">{fmtINR(o.expense)}</span></div>
-              <div className="flex justify-between border-t pt-1 mt-1"><span className="text-muted-foreground">Balance</span><span className={`font-bold ${o.balance >= 0 ? "text-emerald-600" : "text-rose-500"}`}>{fmtINR(o.balance)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Income</span><span className="font-medium text-success-text">{fmtINR(o.income)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Expense</span><span className="font-medium text-destructive-text">{fmtINR(o.expense)}</span></div>
+              <div className="flex justify-between border-t pt-1 mt-1"><span className="text-muted-foreground">Balance</span><span className={`font-bold ${o.balance >= 0 ? "text-success-text" : "text-destructive-text"}`}>{fmtINR(o.balance)}</span></div>
             </div>
           </div>
         ))}
@@ -77,7 +77,7 @@ export default function OwnerComparison({ filters }: { filters: OverviewFilters 
           <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
             {(["income","expense"] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
-                className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${view === v ? "bg-black text-white dark:bg-white dark:text-black" : "text-muted-foreground hover:text-foreground"}`}>
+                className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                 {v}
               </button>
             ))}
@@ -86,9 +86,9 @@ export default function OwnerComparison({ filters }: { filters: OverviewFilters 
         <div className="h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.monthlyData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barSize={10}>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={44} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={44} />
               <Tooltip content={<CustomTooltip />} />
               <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
               {activeOwners.map((o, i) => (

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
+import { EmptyState, ErrorBanner, SkeletonRows } from "@/components/ui/states"
 import {
   CheckCircle2, XCircle, Clock, AlertTriangle,
   Zap, SkipForward, RefreshCw, ChevronLeft, ChevronRight
@@ -50,22 +51,22 @@ const STATUS_META: Record<Status, { label: string; icon: React.ReactNode; color:
   pending: {
     label: "Pending",
     icon: <Clock className="h-4 w-4" />,
-    color: "text-amber-600 bg-amber-50 border-amber-200",
+    color: "text-warning-subtle-foreground bg-warning-subtle border-warning/25",
   },
   generated: {
     label: "Done",
     icon: <CheckCircle2 className="h-4 w-4" />,
-    color: "text-green-600 bg-green-50 border-green-200",
+    color: "text-success-subtle-foreground bg-success-subtle border-success/25",
   },
   skipped: {
     label: "Skipped",
     icon: <XCircle className="h-4 w-4" />,
-    color: "text-gray-500 bg-gray-50 border-gray-200",
+    color: "text-muted-foreground bg-muted border-border",
   },
   updated_since_generated: {
     label: "Template updated",
     icon: <AlertTriangle className="h-4 w-4" />,
-    color: "text-orange-600 bg-orange-50 border-orange-200",
+    color: "text-warning-subtle-foreground bg-warning-subtle border-warning/25",
   },
 }
 
@@ -240,16 +241,16 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
         </div>
 
         {/* ── Loading ──────────────────────────────────────────────────── */}
-        {loading && (
-          <p className="text-sm text-muted-foreground py-6 text-center">Loading preview…</p>
-        )}
+        {loading && <SkeletonRows rows={4} columns={3} className="rounded-lg border" />}
 
         {/* ── No templates ─────────────────────────────────────────────── */}
         {!loading && items.length === 0 && !result && (
-          <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">No active recurring templates found.</p>
-            <p className="text-xs mt-1">Create templates first from "Manage Recurring".</p>
-          </div>
+          <EmptyState
+            icon={RefreshCw}
+            compact
+            title="No active recurring templates found"
+            description={'Create templates first from "Manage Recurring".'}
+          />
         )}
 
         {/* ── Result screen ────────────────────────────────────────────── */}
@@ -261,44 +262,43 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
             <div className="rounded-lg border p-4 space-y-3">
               {result.created.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-green-700 mb-2 flex items-center gap-1">
+                  <p className="text-sm font-medium text-success-text mb-2 flex items-center gap-1">
                     <CheckCircle2 className="h-4 w-4" /> {result.created.length} transaction(s) created
                   </p>
                   {result.created.map((c, i) => (
                     <div key={i} className="text-sm flex justify-between text-muted-foreground pl-5">
                       <span>{c.description}</span>
-                      <span>{fmt(c.amount)} · {c.txn_date}</span>
+                      <span className="tnum">{fmt(c.amount)} · {c.txn_date}</span>
                     </div>
                   ))}
                 </div>
               )}
               {result.updated.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-blue-700 mb-2 flex items-center gap-1">
+                  <p className="text-sm font-medium text-info-text mb-2 flex items-center gap-1">
                     <RefreshCw className="h-4 w-4" /> {result.updated.length} transaction(s) updated
                   </p>
                   {result.updated.map((u, i) => (
                     <div key={i} className="text-sm flex justify-between text-muted-foreground pl-5">
                       <span>{u.description}</span>
-                      <span>{fmt(u.amount)}</span>
+                      <span className="tnum">{fmt(u.amount)}</span>
                     </div>
                   ))}
                 </div>
               )}
               {result.skipped.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1">
                     <SkipForward className="h-4 w-4" /> {result.skipped.length} skipped
                   </p>
                 </div>
               )}
               {result.errors.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-red-600 mb-1">Errors:</p>
-                  {result.errors.map((e, i) => (
-                    <p key={i} className="text-sm text-red-500 pl-5">{e.reason}</p>
-                  ))}
-                </div>
+                <ErrorBanner
+                  message={`${result.errors.length} item(s) failed: ${result.errors
+                    .map((e) => e.reason)
+                    .join(" · ")}`}
+                />
               )}
             </div>
             <div className="flex gap-2">
@@ -378,13 +378,13 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                           <Input
                             type="number"
-                            className="pl-7 h-8 text-sm"
+                            className="pl-7 h-8 text-sm tnum"
                             value={s.amount_override}
                             onChange={(e) => setState(item.id, { amount_override: parseFloat(e.target.value) || 0 })}
                           />
                         </div>
                         {s.amount_override !== item.amount && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground tnum">
                             (template: {fmt(item.amount)})
                           </span>
                         )}
@@ -394,8 +394,8 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
 
                   {/* Row 3: Updated-since-generated warning + force_update option */}
                   {isUpdatedWarning && (
-                    <div className="pl-7 rounded-md bg-orange-50 border border-orange-200 p-2 space-y-1.5">
-                      <p className="text-xs text-orange-700 font-medium">
+                    <div className="pl-7 rounded-md bg-warning-subtle border border-warning/25 p-2 space-y-1.5">
+                      <p className="text-xs text-warning-subtle-foreground font-medium">
                         ⚠️ Template was updated after this month's transaction was created
                         {item.generated_amount !== null && ` (created with ${fmt(item.generated_amount)})`}.
                       </p>
@@ -404,7 +404,7 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
                           checked={s?.force_update ?? false}
                           onCheckedChange={(v) => setState(item.id, { force_update: !!v, include: true })}
                         />
-                        <span className="text-xs text-orange-700">
+                        <span className="text-xs text-warning-subtle-foreground">
                           Update existing transaction to new amount ({fmt(s?.amount_override ?? item.amount)})
                         </span>
                       </label>
@@ -414,8 +414,8 @@ export default function RecurringGenerateModal({ open, onClose, month, year, onG
                   {/* Row 4: Already generated info row */}
                   {item.status === "generated" && (
                     <div className="pl-7 text-xs text-muted-foreground flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      Generated {fmt(item.generated_amount ?? item.amount)} this month
+                      <CheckCircle2 className="h-3 w-3 text-success-text" />
+                      <span className="tnum">Generated {fmt(item.generated_amount ?? item.amount)} this month</span>
                     </div>
                   )}
                 </div>

@@ -22,7 +22,7 @@ function CustomTooltip({ active, payload, label }: any) {
       <p className="font-semibold mb-1.5">{label}</p>
       <div className="flex items-center justify-between gap-3">
         <span className="text-muted-foreground">Surplus</span>
-        <span className={cn("font-bold tabular-nums", gap >= 0 ? "text-emerald-600" : "text-red-500")}>
+        <span className={cn("font-bold tabular-nums", gap >= 0 ? "text-success-text" : "text-destructive-text")}>
           {gap >= 0 ? "+" : ""}₹{Math.abs(gap).toLocaleString("en-IN")}
         </span>
       </div>
@@ -52,7 +52,7 @@ export default function GapTrendChart({ filters, className }: GapTrendChartProps
   const trend   = data?.trend ?? "stable"
   const avgGap  = data?.avgGap ?? 0
   const TrendIcon = trend === "improving" ? TrendingUp : trend === "declining" ? TrendingDown : Minus
-  const trendColor = trend === "improving" ? "text-emerald-600" : trend === "declining" ? "text-red-500" : "text-muted-foreground"
+  const trendColor = trend === "improving" ? "text-success-text" : trend === "declining" ? "text-destructive-text" : "text-muted-foreground"
 
   return (
     <div className={cn("rounded-2xl border bg-card shadow-sm", className)}>
@@ -76,23 +76,23 @@ export default function GapTrendChart({ filters, className }: GapTrendChartProps
             <AreaChart data={data?.data ?? []} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="gradPos" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                  <stop offset="5%"  stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0.02} />
                 </linearGradient>
                 <linearGradient id="gradNeg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#f43f5e" stopOpacity={0.02} />
-                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.3} />
+                  <stop offset="5%"  stopColor="hsl(var(--chart-4))" stopOpacity={0.02} />
+                  <stop offset="95%" stopColor="hsl(var(--chart-4))" stopOpacity={0.3} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-              <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.2} strokeDasharray="4 4" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={48} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+              <ReferenceLine y={0} stroke="hsl(var(--chart-grid))" strokeDasharray="4 4" />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={48} />
               <Tooltip content={<CustomTooltip />} />
               <Area
                 type="monotone"
                 dataKey="gap"
-                stroke="#10b981"
+                stroke="hsl(var(--chart-3))"
                 strokeWidth={2}
                 fill="url(#gradPos)"
                 dot={false}

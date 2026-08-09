@@ -76,8 +76,10 @@ export default function MonthCalendar({ onMonthSelect, defaultMonth }: MonthCale
                   onClick={() => handleMonthClick(index)}
                   className={cn(
                     "h-8 text-xs font-normal",
-                    isSelectedMonth(index) && "bg-black text-white hover:bg-gray-800",
-                    isCurrentMonth(index) && !isSelectedMonth(index) && "bg-blue-50 text-blue-600 border-blue-200",
+                    isSelectedMonth(index) && "bg-primary text-primary-foreground hover:bg-primary/90",
+                    isCurrentMonth(index) &&
+                      !isSelectedMonth(index) &&
+                      "bg-info-subtle text-info-text border border-info/25",
                   )}
                 >
                   {month}

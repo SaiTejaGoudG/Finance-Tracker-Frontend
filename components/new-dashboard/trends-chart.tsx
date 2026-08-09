@@ -94,31 +94,31 @@ export default function TrendsChart({ data, loading, className }: TrendsChartPro
           <AreaChart data={data} margin={{ top: 5, right: 16, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#10b981" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                <stop offset="5%"  stopColor="hsl(var(--chart-3))" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0.02} />
               </linearGradient>
               <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#f43f5e" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.02} />
+                <stop offset="5%"  stopColor="hsl(var(--chart-4))" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="hsl(var(--chart-4))" stopOpacity={0.02} />
               </linearGradient>
               <linearGradient id="gradInvestment" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
+                <stop offset="5%"  stopColor="hsl(var(--chart-1))" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.02} />
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
 
             <XAxis
               dataKey="shortLabel"
-              tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }}
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
               tickFormatter={fmtY}
-              tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }}
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
               axisLine={false}
               tickLine={false}
               width={52}
@@ -135,7 +135,7 @@ export default function TrendsChart({ data, loading, className }: TrendsChartPro
             <Area
               type="monotone"
               dataKey="Income"
-              stroke="#10b981"
+              stroke="hsl(var(--chart-3))"
               strokeWidth={2}
               fill="url(#gradIncome)"
               dot={false}
@@ -144,7 +144,7 @@ export default function TrendsChart({ data, loading, className }: TrendsChartPro
             <Area
               type="monotone"
               dataKey="Expense"
-              stroke="#f43f5e"
+              stroke="hsl(var(--chart-4))"
               strokeWidth={2}
               fill="url(#gradExpense)"
               dot={false}
@@ -153,7 +153,7 @@ export default function TrendsChart({ data, loading, className }: TrendsChartPro
             <Area
               type="monotone"
               dataKey="Investment"
-              stroke="#6366f1"
+              stroke="hsl(var(--chart-1))"
               strokeWidth={2}
               fill="url(#gradInvestment)"
               dot={false}

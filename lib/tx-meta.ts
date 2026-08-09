@@ -89,8 +89,16 @@ export interface TypeColor {
   emoji: string
   /** hex background for the summary card icon square */
   iconColor: string
-  /** Tailwind text-color class for the amount (safe: hardcoded in component) */
+  /**
+   * Tailwind text-color class for the amount.
+   * Uses semantic tokens (see app/globals.css) so it inverts in dark mode —
+   * the previous text-green-600 / text-red-600 literals did not.
+   */
   amountText: string
+  /** Subtle pill fill + text pair, for type badges */
+  badgeClass: string
+  /** Chart/series token for this type */
+  chartVar: string
   amountPrefix: string
   label: string
 }
@@ -99,42 +107,54 @@ export const TYPE_COLORS: Record<TxType, TypeColor> = {
   income: {
     emoji:        "💰",
     iconColor:    "#22c55e", // green-500
-    amountText:   "text-green-600",
+    amountText:   "text-success-text",
+    badgeClass:   "bg-success-subtle text-success-subtle-foreground",
+    chartVar:     "hsl(var(--chart-3))",
     amountPrefix: "+",
     label:        "Income",
   },
   expense: {
     emoji:        "💸",
     iconColor:    "#ef4444", // red-500
-    amountText:   "text-red-600",
+    amountText:   "text-destructive-text",
+    badgeClass:   "bg-destructive-subtle text-destructive-subtle-foreground",
+    chartVar:     "hsl(var(--chart-4))",
     amountPrefix: "−",
     label:        "Expense",
   },
   credit: {
     emoji:        "💳",
     iconColor:    "#8b5cf6", // violet-500
-    amountText:   "text-violet-600",
+    amountText:   "text-info-text",
+    badgeClass:   "bg-info-subtle text-info-subtle-foreground",
+    chartVar:     "hsl(var(--chart-6))",
     amountPrefix: "−",
     label:        "Credit Card",
   },
   "petty-cash": {
     emoji:        "🪙",
     iconColor:    "#f97316", // orange-500
-    amountText:   "text-orange-600",
+    amountText:   "text-warning-text",
+    badgeClass:   "bg-warning-subtle text-warning-subtle-foreground",
+    chartVar:     "hsl(var(--chart-2))",
     amountPrefix: "−",
     label:        "Petty Cash",
   },
   investment: {
     emoji:        "📈",
     iconColor:    "#3b82f6", // blue-500
-    amountText:   "text-blue-600",
+    amountText:   "text-info-text",
+    badgeClass:   "bg-info-subtle text-info-subtle-foreground",
+    chartVar:     "hsl(var(--chart-5))",
     amountPrefix: "↑",
     label:        "Investment",
   },
   summary: {
     emoji:        "📊",
     iconColor:    "#9ca3af", // gray-400
-    amountText:   "text-gray-700",
+    amountText:   "text-foreground",
+    badgeClass:   "bg-muted text-muted-foreground",
+    chartVar:     "hsl(var(--muted-foreground))",
     amountPrefix: "",
     label:        "Summary",
   },

@@ -9,6 +9,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import StatusBadge from "@/components/status-badge"
+import { EmptyState } from "@/components/ui/states"
 import TransactionActions from "@/components/transaction-actions"
 import { ArrowDownIcon, ArrowUpIcon, Search, ReceiptText } from "lucide-react"
 import { getCategoryMeta, getTypeColor } from "@/lib/tx-meta"
@@ -183,34 +184,28 @@ export default function TransactionTabs(props: Props) {
 
   return (
     <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabKey)}>
-      <TabsList className="grid w-full grid-cols-6 bg-muted">
-        <TabsTrigger
-          value="all-transactions"
-          className="data-[state=active]:bg-black data-[state=active]:text-white text-sm"
-        >
-          All Transactions
-        </TabsTrigger>
-        <TabsTrigger value="income" className="data-[state=active]:bg-black data-[state=active]:text-white text-sm">
-          Income
-        </TabsTrigger>
-        <TabsTrigger
-          value="investments"
-          className="data-[state=active]:bg-black data-[state=active]:text-white text-sm"
-        >
-          Investments
-        </TabsTrigger>
-        <TabsTrigger value="expenses" className="data-[state=active]:bg-black data-[state=active]:text-white text-sm">
-          Expenses
-        </TabsTrigger>
-        <TabsTrigger
-          value="credit-cards"
-          className="data-[state=active]:bg-black data-[state=active]:text-white text-sm"
-        >
-          Credit Cards
-        </TabsTrigger>
-        <TabsTrigger value="petty-cash" className="data-[state=active]:bg-black data-[state=active]:text-white text-sm">
-          Petty Cash
-        </TabsTrigger>
+      {/* Underline tabs — matches the pattern on All Transactions and
+          Configurations. The previous bg-black/text-white active state had no
+          dark-mode inverse. */}
+      <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+        {(
+          [
+            ["all-transactions", "All Transactions"],
+            ["income", "Income"],
+            ["investments", "Investments"],
+            ["expenses", "Expenses"],
+            ["credit-cards", "Credit Cards"],
+            ["petty-cash", "Petty Cash"],
+          ] as const
+        ).map(([value, label]) => (
+          <TabsTrigger
+            key={value}
+            value={value}
+            className="relative rounded-none border-b-2 border-transparent bg-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+          >
+            {label}
+          </TabsTrigger>
+        ))}
       </TabsList>
 
       <TabsContent value={activeTab} className="mt-4">
@@ -242,7 +237,7 @@ export default function TransactionTabs(props: Props) {
             {/* Credit card summary strip — compact pill, only when a specific card is selected */}
             {creditCardSummary && (
               <div className="inline-flex items-center gap-2 mt-3 px-3.5 py-2 bg-muted/70 border rounded-2xl text-sm w-fit">
-                <span className="flex items-center justify-center w-6 h-6 rounded-md bg-violet-100 text-base select-none">
+                <span className="flex items-center justify-center w-6 h-6 rounded-md bg-info-subtle text-base select-none">
                   💳
                 </span>
                 <span className="font-semibold text-foreground">{creditCardSummary.cardName}</span>
@@ -256,7 +251,7 @@ export default function TransactionTabs(props: Props) {
                 )}
                 <span className="text-muted-foreground/50">·</span>
                 <span className="text-muted-foreground text-xs">
-                  Total: <span className="font-semibold text-violet-600">₹{creditCardSummary.total.toLocaleString("en-IN")}</span>
+                  Total: <span className="font-semibold tnum text-info-text">₹{creditCardSummary.total.toLocaleString("en-IN")}</span>
                 </span>
               </div>
             )}
@@ -335,7 +330,7 @@ export default function TransactionTabs(props: Props) {
                                 <p className="text-xs text-muted-foreground truncate">{transaction.category}</p>
                                 {/* Card name badge — shown in All Transactions for credit-type rows */}
                                 {activeTab === "all-transactions" && transaction.type === "credit" && transaction.cardName && (
-                                  <span className="inline-flex items-center gap-0.5 text-xs text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                  <span className="inline-flex items-center gap-0.5 text-xs text-info-text bg-info-subtle border border-info/25 px-1.5 py-0.5 rounded-full flex-shrink-0">
                                     💳 {transaction.cardName}
                                   </span>
                                 )}
@@ -363,7 +358,7 @@ export default function TransactionTabs(props: Props) {
 
                         {/* Amount — colored by type */}
                         <TableCell className="whitespace-nowrap">
-                          <span className={cn("text-sm font-semibold", colors.amountText)}>
+                          <span className={cn("text-sm font-semibold tnum", colors.amountText)}>
                             {colors.amountPrefix}₹{transaction.amount.toLocaleString("en-IN")}
                           </span>
                         </TableCell>
@@ -393,19 +388,15 @@ export default function TransactionTabs(props: Props) {
                 </TableBody>
               </Table>
             ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-muted mb-4">
-                  <ReceiptText className="h-7 w-7 text-muted-foreground" />
-                </div>
-                <p className="text-sm font-medium text-foreground mb-1">
-                  {searchTerm ? "No results found" : "No transactions yet"}
-                </p>
-                <p className="text-xs text-muted-foreground max-w-[220px]">
-                  {searchTerm
+              <EmptyState
+                icon={ReceiptText}
+                title={searchTerm ? "No results found" : "No transactions yet"}
+                description={
+                  searchTerm
                     ? `Nothing matched "${searchTerm}". Try a different search or clear your filters.`
-                    : "No transactions found for the selected period or filters."}
-                </p>
-              </div>
+                    : "No transactions found for the selected period or filters."
+                }
+              />
             )}
           </CardContent>
         </Card>

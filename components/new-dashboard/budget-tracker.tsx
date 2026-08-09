@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Plus, Trash2, AlertCircle, CheckCircle, AlertTriangle } from "lucide-react"
+import { Plus, Trash2, AlertCircle, CheckCircle, AlertTriangle, Wallet } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { EmptyState, SkeletonBlock } from "@/components/ui/states"
 import type { OverviewFilters } from "./use-overview-data"
 
 interface BudgetRow {
@@ -19,9 +20,9 @@ interface BudgetRow {
 }
 
 const statusStyle = {
-  ok:      { bar: "bg-emerald-500", icon: CheckCircle,    text: "text-emerald-600" },
-  warning: { bar: "bg-amber-500",   icon: AlertTriangle,  text: "text-amber-600" },
-  over:    { bar: "bg-red-500",     icon: AlertCircle,    text: "text-red-500" },
+  ok:      { bar: "bg-success",     icon: CheckCircle,    text: "text-success-text" },
+  warning: { bar: "bg-warning",     icon: AlertTriangle,  text: "text-warning-text" },
+  over:    { bar: "bg-destructive", icon: AlertCircle,    text: "text-destructive-text" },
 }
 
 interface BudgetTrackerProps { filters: OverviewFilters; className?: string }
@@ -79,8 +80,8 @@ export default function BudgetTracker({ filters, className }: BudgetTrackerProps
         </div>
         {vsActual && (
           <div className="text-right text-xs text-muted-foreground">
-            <p>Spent <span className="font-semibold text-foreground">₹{vsActual.totalActual.toLocaleString("en-IN")}</span></p>
-            <p>of <span className="font-semibold">₹{vsActual.totalLimit.toLocaleString("en-IN")}</span> budget</p>
+            <p>Spent <span className="font-semibold text-foreground tnum">₹{vsActual.totalActual.toLocaleString("en-IN")}</span></p>
+            <p>of <span className="font-semibold tnum">₹{vsActual.totalLimit.toLocaleString("en-IN")}</span> budget</p>
           </div>
         )}
       </div>
@@ -88,16 +89,19 @@ export default function BudgetTracker({ filters, className }: BudgetTrackerProps
       {loading ? (
         <div className="p-5 space-y-4">
           {[1,2,3].map(i => <div key={i} className="space-y-1.5">
-            <div className="h-3 w-32 bg-muted animate-pulse rounded" />
-            <div className="h-2 w-full bg-muted animate-pulse rounded-full" />
+            <SkeletonBlock className="h-3 w-32 rounded" />
+            <SkeletonBlock className="h-2 w-full rounded-full" />
           </div>)}
         </div>
       ) : (
         <div className="divide-y">
           {budgets.length === 0 && !adding && (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              No budgets set. Add one to start tracking.
-            </div>
+            <EmptyState
+              compact
+              icon={Wallet}
+              title="No budgets set"
+              description="Add a monthly limit for a category to start tracking."
+            />
           )}
 
           {budgets.map((b) => {
@@ -112,13 +116,13 @@ export default function BudgetTracker({ filters, className }: BudgetTrackerProps
                     <span className="text-sm font-medium">{b.category}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm tabular-nums">
+                    <span className="text-sm tnum">
                       <span className="font-bold">₹{b.actual.toLocaleString("en-IN")}</span>
                       <span className="text-muted-foreground"> / ₹{b.monthly_limit.toLocaleString("en-IN")}</span>
                     </span>
                     <button
                       onClick={() => deleteBudget(b.category)}
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-all"
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive-text transition-all"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -127,7 +131,7 @@ export default function BudgetTracker({ filters, className }: BudgetTrackerProps
                 <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                   <div className={cn("h-full rounded-full transition-all duration-500", style.bar)} style={{ width: `${pct}%` }} />
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
+                <div className="flex justify-between text-xs text-muted-foreground tnum">
                   <span>{b.percentage}% used</span>
                   <span>{b.remaining >= 0 ? `₹${b.remaining.toLocaleString("en-IN")} left` : `₹${Math.abs(b.remaining).toLocaleString("en-IN")} over`}</span>
                 </div>
@@ -143,14 +147,14 @@ export default function BudgetTracker({ filters, className }: BudgetTrackerProps
                   placeholder="Category (e.g. Shopping)"
                   value={newCat}
                   onChange={(e) => setNewCat(e.target.value)}
-                  className="text-sm rounded-lg border bg-muted/40 px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500/30"
+                  className="text-sm rounded-lg border bg-muted/40 px-3 py-2 outline-none focus:ring-2 focus:ring-ring/40"
                 />
                 <input
                   type="number"
                   placeholder="Monthly limit (₹)"
                   value={newLimit}
                   onChange={(e) => setNewLimit(e.target.value)}
-                  className="text-sm rounded-lg border bg-muted/40 px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500/30"
+                  className="text-sm rounded-lg border bg-muted/40 px-3 py-2 outline-none focus:ring-2 focus:ring-ring/40"
                 />
               </div>
               <div className="flex gap-2">
@@ -166,7 +170,7 @@ export default function BudgetTracker({ filters, className }: BudgetTrackerProps
             <div className="px-5 py-3">
               <button
                 onClick={() => setAdding(true)}
-                className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-700 font-medium"
+                className="flex items-center gap-1.5 text-xs text-info-text hover:text-info-text/80 font-medium transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add budget

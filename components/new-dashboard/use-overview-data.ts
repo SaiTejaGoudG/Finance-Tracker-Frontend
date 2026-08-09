@@ -107,17 +107,53 @@ function useAsyncFetch<T>(
   return state
 }
 
-// ─── Main hook — all 5 endpoints ─────────────────────────────────────────────
+// ─── Per-endpoint hooks ───────────────────────────────────────────────────────
+// Each surface fetches only what it renders. Previously every one of these six
+// requests fired on any dashboard load, regardless of which tab was open —
+// six round-trips to render one panel.
 
-export function useOverviewData(filters: OverviewFilters) {
-  const deps = [filters.startDate, filters.endDate, filters.ownerType]
-
-  const summary  = useAsyncFetch<SummaryData>(() => fetchApi("overview/summary", filters), deps)
-  const trends   = useAsyncFetch<TrendsData>(() => fetchApi("analytics/trends", filters), deps)
-  const expDist  = useAsyncFetch<DistributionData>(() => fetchApi("analytics/distribution", filters, { type: "expense" }), deps)
-  const incDist  = useAsyncFetch<DistributionData>(() => fetchApi("analytics/distribution", filters, { type: "income" }), deps)
-  const petty    = useAsyncFetch<PettyCashData>(() => fetchApi("analytics/petty-cash", filters), deps)
-  const ccAnalytics = useAsyncFetch<CreditCardData>(() => fetchApi("analytics/credit-cards", filters), deps)
-
-  return { summary, trends, expDist, incDist, petty, ccAnalytics }
+export function useSummary(filters: OverviewFilters) {
+  return useAsyncFetch<SummaryData>(
+    () => fetchApi("overview/summary", filters),
+    [filters.startDate, filters.endDate, filters.ownerType],
+  )
 }
+
+export function useTrends(filters: OverviewFilters) {
+  return useAsyncFetch<TrendsData>(
+    () => fetchApi("analytics/trends", filters),
+    [filters.startDate, filters.endDate, filters.ownerType],
+  )
+}
+
+export function useExpenseDistribution(filters: OverviewFilters) {
+  return useAsyncFetch<DistributionData>(
+    () => fetchApi("analytics/distribution", filters, { type: "expense" }),
+    [filters.startDate, filters.endDate, filters.ownerType],
+  )
+}
+
+export function useIncomeDistribution(filters: OverviewFilters) {
+  return useAsyncFetch<DistributionData>(
+    () => fetchApi("analytics/distribution", filters, { type: "income" }),
+    [filters.startDate, filters.endDate, filters.ownerType],
+  )
+}
+
+export function usePettyCash(filters: OverviewFilters) {
+  return useAsyncFetch<PettyCashData>(
+    () => fetchApi("analytics/petty-cash", filters),
+    [filters.startDate, filters.endDate, filters.ownerType],
+  )
+}
+
+export function useCreditCardAnalytics(filters: OverviewFilters) {
+  return useAsyncFetch<CreditCardData>(
+    () => fetchApi("analytics/credit-cards", filters),
+    [filters.startDate, filters.endDate, filters.ownerType],
+  )
+}
+
+// The old composed `useOverviewData` hook was removed when the dashboard tabs
+// became routes: it fetched all six endpoints on every load, so opening any tab
+// paid for the other five. Each route now calls only the hooks it renders.

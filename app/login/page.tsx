@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,16 +19,6 @@ function LoginContent() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
   const sessionExpired = searchParams.get("reason") === "session_expired"
-
-  // Force light mode on login/signup — dark theme from ThemeProvider shouldn't bleed here
-  useEffect(() => {
-    const html = document.documentElement
-    const wasDark = html.classList.contains("dark")
-    html.classList.remove("dark")
-    return () => {
-      if (wasDark) html.classList.add("dark")
-    }
-  }, [])
 
   const [showPassword, setShowPassword] = useState(false)
   const [isLogin, setIsLogin] = useState(true)
@@ -88,52 +78,35 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side - Illustration */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
-        {/* Geometric Background Pattern */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-full h-full">
-            <svg width="100%" height="100%" viewBox="0 0 800 600" className="absolute inset-0">
-              <defs>
-                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#1f2937" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="#111827" stopOpacity="0.9" />
-                </linearGradient>
-              </defs>
-              <polygon points="0,0 400,0 200,300" fill="url(#grad1)" />
-              <polygon points="400,0 800,0 600,400" fill="url(#grad1)" />
-              <polygon points="0,300 300,600 0,600" fill="url(#grad1)" />
-              <polygon points="500,600 800,600 800,300" fill="url(#grad1)" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Content */}
+      {/* Left side - Illustration on a solid emphasis panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-primary relative overflow-hidden">
         <div className="relative z-10 flex items-center justify-center w-full p-12">
           <AuthIllustration />
         </div>
       </div>
 
       {/* Right side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-card">
         <div className="w-full max-w-md space-y-8">
           {/* Session expired banner */}
           {sessionExpired && (
-            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+            <div className="flex items-start gap-3 rounded-lg border border-warning/25 bg-warning-subtle px-4 py-3 text-sm text-warning-subtle-foreground">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-warning-subtle-foreground" />
               <div>
                 <p className="font-medium">Your session has expired</p>
-                <p className="text-amber-700 text-xs mt-0.5">You were signed out due to inactivity. Please log in again.</p>
+                <p className="text-warning-subtle-foreground/80 text-xs mt-0.5">
+                  You were signed out due to inactivity. Please log in again.
+                </p>
               </div>
             </div>
           )}
 
           {/* Tab Navigation */}
-          <div className="flex rounded-lg bg-gray-100 p-1">
+          <div className="flex rounded-lg bg-muted p-1">
             <button
               onClick={() => setIsLogin(true)}
               className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
-                isLogin ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                isLogin ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Login
@@ -141,7 +114,7 @@ function LoginContent() {
             <button
               onClick={() => setIsLogin(false)}
               className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
-                !isLogin ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                !isLogin ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Sign Up
@@ -150,8 +123,8 @@ function LoginContent() {
 
           {/* Form Header */}
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900">{isLogin ? "Login" : "Sign Up"}</h2>
-            <p className="mt-2 text-gray-600">
+            <h2 className="text-3xl font-bold text-foreground">{isLogin ? "Login" : "Sign Up"}</h2>
+            <p className="mt-2 text-muted-foreground">
               {isLogin ? "Enter your credentials to access your account" : "Create a new account to get started"}
             </p>
           </div>
@@ -160,7 +133,7 @@ function LoginContent() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {!isLogin && (
               <div>
-                <Label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                <Label htmlFor="name" className="block text-sm font-medium text-foreground mb-2">
                   Full Name
                 </Label>
                 <Input
@@ -171,13 +144,13 @@ function LoginContent() {
                   placeholder="John Doe"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full"
                 />
               </div>
             )}
 
             <div>
-              <Label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <Label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                 Email
               </Label>
               <Input
@@ -188,12 +161,12 @@ function LoginContent() {
                 placeholder="name@example.com"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full"
               />
             </div>
 
             <div>
-              <Label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <Label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
                 Password
               </Label>
               <div className="relative">
@@ -205,7 +178,7 @@ function LoginContent() {
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pr-10"
                 />
                 <button
                   type="button"
@@ -213,14 +186,14 @@ function LoginContent() {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
                   ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
+                    <Eye className="h-4 w-4 text-muted-foreground" />
                   )}
                 </button>
               </div>
               {!isLogin && (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Min 8 chars with uppercase, lowercase, number &amp; special character
                 </p>
               )}
@@ -228,7 +201,7 @@ function LoginContent() {
 
             {!isLogin && (
               <div>
-                <Label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                <Label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-2">
                   Confirm Password
                 </Label>
                 <Input
@@ -239,7 +212,7 @@ function LoginContent() {
                   placeholder="••••••••"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full"
                 />
               </div>
             )}
@@ -253,18 +226,14 @@ function LoginContent() {
                     checked={formData.rememberMe}
                     onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, rememberMe: checked as boolean }))}
                   />
-                  <Label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600">
+                  <Label htmlFor="rememberMe" className="ml-2 text-sm text-muted-foreground">
                     Remember me
                   </Label>
                 </div>
               </div>
             )}
 
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-black hover:bg-gray-800 text-white py-2 px-4 rounded-md transition-colors"
-            >
+            <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -280,9 +249,9 @@ function LoginContent() {
 
           {/* Alternative Actions */}
           <div className="text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button onClick={switchMode} className="text-blue-600 hover:text-blue-500 font-medium">
+              <button onClick={switchMode} className="text-info-text hover:text-info-text/80 font-medium transition-colors">
                 {isLogin ? "Sign up" : "Login"}
               </button>
             </p>

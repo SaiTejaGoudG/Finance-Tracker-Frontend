@@ -22,7 +22,7 @@ function CustomTooltip({ active, payload, label }: any) {
       <p className="font-semibold text-foreground mb-1.5">{label}</p>
       <div className="flex items-center justify-between gap-3">
         <span className="text-muted-foreground">Petty Cash</span>
-        <span className="font-medium tabular-nums text-violet-600">
+        <span className="font-medium tabular-nums text-info-text">
           ₹{val.toLocaleString("en-IN")}
         </span>
       </div>
@@ -79,7 +79,7 @@ export default function PettyCashArea({ data, total = 0, loading, className }: P
         {!loading && total > 0 && (
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Total</p>
-            <p className="text-sm font-bold text-violet-600 tabular-nums">
+            <p className="text-sm font-bold text-info-text tabular-nums">
               ₹{total.toLocaleString("en-IN")}
             </p>
           </div>
@@ -98,38 +98,38 @@ export default function PettyCashArea({ data, total = 0, loading, className }: P
             <AreaChart data={data} margin={{ top: 5, right: 12, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="gradPetty" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.02} />
+                  <stop offset="5%"  stopColor="hsl(var(--chart-6))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--chart-6))" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
 
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis
                 tickFormatter={fmtY}
-                tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
                 width={48}
               />
 
-              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#7c3aed", strokeOpacity: 0.1, strokeWidth: 30 }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "hsl(var(--chart-6))", strokeOpacity: 0.1, strokeWidth: 30 }} />
 
               <Area
                 type="monotone"
                 dataKey="amount"
-                stroke="#7c3aed"
+                stroke="hsl(var(--chart-6))"
                 strokeWidth={2}
                 fill="url(#gradPetty)"
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 0, fill: "#7c3aed" }}
+                activeDot={{ r: 4, strokeWidth: 0, fill: "hsl(var(--chart-6))" }}
               />
             </AreaChart>
           </ResponsiveContainer>

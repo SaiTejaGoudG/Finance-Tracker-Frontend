@@ -128,7 +128,7 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
   if (dimensions.width === 0) {
     return (
       <div ref={containerRef} className="w-full h-[280px] flex items-center justify-center">
-        <div className="text-sm text-gray-500">Loading chart...</div>
+        <div className="text-sm text-muted-foreground">Loading chart...</div>
       </div>
     )
   }
@@ -138,16 +138,16 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
       {/* Legend - Updated order: Income, Expenses, Investments */}
       <div className="flex items-center justify-center gap-4 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-500 rounded-sm"></div>
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Income</span>
+          <div className="w-3 h-3 bg-chart-3 rounded-sm"></div>
+          <span className="text-xs font-medium text-foreground">Income</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-red-500 rounded-sm"></div>
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Expenses</span>
+          <div className="w-3 h-3 bg-chart-4 rounded-sm"></div>
+          <span className="text-xs font-medium text-foreground">Expenses</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Investments</span>
+          <div className="w-3 h-3 bg-chart-5 rounded-sm"></div>
+          <span className="text-xs font-medium text-foreground">Investments</span>
         </div>
       </div>
 
@@ -156,7 +156,7 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
         <svg
           width={chartWidth}
           height={chartHeight}
-          className="w-full bg-gray-50 dark:bg-gray-900 rounded-lg"
+          className="w-full bg-chart-surface rounded-lg"
           onMouseLeave={handleMouseLeave}
         >
           {/* Horizontal grid lines */}
@@ -169,15 +169,14 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
                   y1={y}
                   x2={chartWidth - padding.right}
                   y2={y}
-                  stroke="#e5e7eb"
+                  stroke="hsl(var(--chart-grid))"
                   strokeWidth="0.5"
-                  className="dark:stroke-gray-700"
                 />
                 <text
                   x={padding.left - 8}
                   y={y + 3}
                   textAnchor="end"
-                  className="text-xs fill-gray-500 dark:fill-gray-400"
+                  className="text-xs fill-muted-foreground"
                   fontSize="10"
                 >
                   {formatAxisLabel(tickValue)}
@@ -203,7 +202,7 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
                   y={padding.top + chartAreaHeight - incomeHeight}
                   width={barWidth}
                   height={incomeHeight}
-                  fill="#10B981"
+                  fill="hsl(var(--chart-3))"
                   className="hover:opacity-80 transition-opacity cursor-pointer"
                   onMouseMove={(e) => handleMouseMove(e, data)}
                 />
@@ -214,7 +213,7 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
                   y={padding.top + chartAreaHeight - expenseHeight}
                   width={barWidth}
                   height={expenseHeight}
-                  fill="#EF4444"
+                  fill="hsl(var(--chart-4))"
                   className="hover:opacity-80 transition-opacity cursor-pointer"
                   onMouseMove={(e) => handleMouseMove(e, data)}
                 />
@@ -225,7 +224,7 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
                   y={padding.top + chartAreaHeight - investmentHeight}
                   width={barWidth}
                   height={investmentHeight}
-                  fill="#3B82F6"
+                  fill="hsl(var(--chart-5))"
                   className="hover:opacity-80 transition-opacity cursor-pointer"
                   onMouseMove={(e) => handleMouseMove(e, data)}
                 />
@@ -235,7 +234,7 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
                   x={monthX + (barWidth * 3 + barSpacing * 2) / 2}
                   y={chartHeight - padding.bottom + 16}
                   textAnchor="middle"
-                  className="text-xs fill-gray-600 dark:fill-gray-400"
+                  className="text-xs fill-muted-foreground"
                   fontSize="11"
                 >
                   {data.month}
@@ -248,7 +247,7 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
         {/* Tooltip - Updated order */}
         {tooltip && (
           <div
-            className="absolute z-10 bg-gray-900 dark:bg-gray-800 text-white p-3 rounded-lg shadow-lg border border-gray-700 min-w-[180px]"
+            className="absolute z-10 bg-popover text-popover-foreground border rounded-lg shadow-md p-2.5 text-xs min-w-[180px]"
             style={{
               left: Math.min(tooltip.x + 10, chartWidth - 200),
               top: Math.max(tooltip.y - 10, 10),
@@ -258,22 +257,22 @@ export default function ModernChart({ monthlyTrend }: ModernChartProps) {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 bg-green-500 rounded-sm"></div>
-                  <span className="text-gray-300 text-sm">Income</span>
+                  <div className="w-2.5 h-2.5 bg-chart-3 rounded-sm"></div>
+                  <span className="text-muted-foreground text-sm">Income</span>
                 </div>
                 <span className="font-medium text-sm">{formatCurrency(tooltip.income)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 bg-red-500 rounded-sm"></div>
-                  <span className="text-gray-300 text-sm">Expenses</span>
+                  <div className="w-2.5 h-2.5 bg-chart-4 rounded-sm"></div>
+                  <span className="text-muted-foreground text-sm">Expenses</span>
                 </div>
                 <span className="font-medium text-sm">{formatCurrency(tooltip.expenses)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-sm"></div>
-                  <span className="text-gray-300 text-sm">Investments</span>
+                  <div className="w-2.5 h-2.5 bg-chart-5 rounded-sm"></div>
+                  <span className="text-muted-foreground text-sm">Investments</span>
                 </div>
                 <span className="font-medium text-sm">{formatCurrency(tooltip.investments)}</span>
               </div>

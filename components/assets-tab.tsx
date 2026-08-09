@@ -16,6 +16,7 @@ import {
 import { format, parseISO } from "date-fns"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
+import { EmptyState } from "@/components/ui/states"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ function AddAssetDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-black text-white hover:bg-gray-800 gap-1.5">
+        <Button className="gap-1.5">
           <Plus className="h-4 w-4" /> Add Asset
         </Button>
       </DialogTrigger>
@@ -271,7 +272,7 @@ function AddAssetDialog({
 
         <div className="px-5 py-4 border-t shrink-0 flex justify-end gap-2">
           <Button variant="outline" onClick={() => { setForm({ ...BLANK_FORM }); setOpen(false) }}>Cancel</Button>
-          <Button className="bg-black text-white hover:bg-gray-800" disabled={!isValid} onClick={handleAdd}>
+          <Button disabled={!isValid} onClick={handleAdd}>
             Add Asset
           </Button>
         </div>
@@ -441,7 +442,6 @@ function EditAssetDialog({
             Cancel
           </button>
           <Button
-            className="bg-black text-white hover:bg-gray-800"
             disabled={!isValid || saving}
             onClick={handleSave}
           >
@@ -502,9 +502,9 @@ function AssetCard({
           <div className="flex flex-col items-end gap-1 shrink-0">
             <div className="flex items-center gap-1.5">
               <EditAssetDialog asset={asset} availableLoans={availableLoans} setAssets={setAssets} />
-              <p className="text-lg font-bold tabular-nums">{fmtINR(asset.currentValue)}</p>
+              <p className="text-lg font-bold tnum">{fmtINR(asset.currentValue)}</p>
             </div>
-            <div className={`flex items-center justify-end gap-0.5 text-xs font-semibold ${up ? "text-emerald-600" : "text-red-600"}`}>
+            <div className={`flex items-center justify-end gap-0.5 text-xs font-semibold tnum ${up ? "text-success-text" : "text-destructive-text"}`}>
               {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
               {fmtINR(Math.abs(gain))} ({up ? "+" : ""}{gainPct.toFixed(1)}%)
             </div>
@@ -515,7 +515,7 @@ function AssetCard({
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-muted/40 px-3 py-2">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Purchase Price</p>
-            <p className="text-sm font-bold tabular-nums mt-0.5">{fmtINR(asset.purchasePrice)}</p>
+            <p className="text-sm font-bold tnum mt-0.5">{fmtINR(asset.purchasePrice)}</p>
           </div>
           <div className="rounded-xl bg-muted/40 px-3 py-2">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Purchase Date</p>
@@ -610,7 +610,7 @@ export default function AssetsTab() {
             label: "Total Asset Value",
             value: fmtINR(totalValue),
             sub: "Current estimated value",
-            cls: "text-blue-600",
+            cls: "text-info-text",
           },
           {
             label: "Total Invested",
@@ -622,7 +622,7 @@ export default function AssetsTab() {
             label: "Unrealised Gain / Loss",
             value: `${totalGain >= 0 ? "+" : ""}${fmtINR(totalGain)}`,
             sub: `${gainPct >= 0 ? "+" : ""}${gainPct.toFixed(2)}% overall`,
-            cls: totalGain >= 0 ? "text-emerald-600" : "text-red-600",
+            cls: totalGain >= 0 ? "text-success-text" : "text-destructive-text",
           },
           {
             label: "Total Assets",
@@ -633,27 +633,26 @@ export default function AssetsTab() {
         ].map(t => (
           <div key={t.label} className="rounded-2xl border bg-card p-4 shadow-sm">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.label}</p>
-            <p className={`text-xl font-bold tabular-nums mt-2 ${t.cls}`}>{t.value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{t.sub}</p>
+            <p className={`text-xl font-bold tnum mt-2 ${t.cls}`}>{t.value}</p>
+            <p className="text-xs text-muted-foreground mt-1 tnum">{t.sub}</p>
           </div>
         ))}
       </div>
 
       {/* Cards */}
       {active.length === 0 ? (
-        <div className="rounded-2xl border border-dashed py-16 flex flex-col items-center gap-3 text-center">
-          <Package className="h-10 w-10 text-muted-foreground opacity-30" />
-          <div>
-            <p className="font-medium">No assets yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Add land, gold, property or any physical asset to start tracking your portfolio
-            </p>
-          </div>
-          <AddAssetDialog
-            availableLoans={availableLoans}
-            setAssets={setAssets}
-          />
-        </div>
+        <EmptyState
+          className="rounded-2xl border border-dashed"
+          icon={Package}
+          title="No assets yet"
+          description="Add land, gold, property or any physical asset to start tracking your portfolio."
+          action={
+            <AddAssetDialog
+              availableLoans={availableLoans}
+              setAssets={setAssets}
+            />
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {active.map(a => (
@@ -663,9 +662,9 @@ export default function AssetsTab() {
       )}
 
       {/* Explainer note */}
-      <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3.5 text-sm">
-        <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-        <p className="text-blue-800 dark:text-blue-200">
+      <div className="flex items-start gap-3 rounded-xl border border-info/25 bg-info-subtle p-3.5 text-sm">
+        <Info className="h-4 w-4 text-info-subtle-foreground shrink-0 mt-0.5" />
+        <p className="text-info-subtle-foreground">
           Asset purchases are <strong>not expenses</strong>. Buying land with loan money converts cash into
           an asset — your net worth stays the same. Only EMI interest erodes net worth.
           To record a purchase, add it here <em>and</em> add an <strong>Asset</strong> transaction in the

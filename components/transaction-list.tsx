@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Eye, Edit, Calendar, CreditCard, Wallet, TrendingUp, ArrowUpDown } from "lucide-react"
+import { EmptyState } from "@/components/ui/states"
+import StatusBadge from "@/components/status-badge"
+import { Eye, Edit, Calendar, CreditCard, Wallet, TrendingUp, ArrowUpDown, Receipt } from "lucide-react"
 import type { Transaction } from "./dashboard"
 
 type TransactionListProps = {
@@ -26,28 +27,28 @@ export default function TransactionList({
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "income":
-        return <TrendingUp className="h-4 w-4 text-green-600" />
+        return <TrendingUp className="h-4 w-4 text-success-text" />
       case "expense":
-        return <ArrowUpDown className="h-4 w-4 text-red-600" />
+        return <ArrowUpDown className="h-4 w-4 text-destructive-text" />
       case "credit":
-        return <CreditCard className="h-4 w-4 text-blue-600" />
+        return <CreditCard className="h-4 w-4 text-info-text" />
       case "petty-cash":
-        return <Wallet className="h-4 w-4 text-orange-600" />
+        return <Wallet className="h-4 w-4 text-warning-text" />
       case "investment":
-        return <TrendingUp className="h-4 w-4 text-purple-600" />
+        return <TrendingUp className="h-4 w-4 text-info-text" />
       default:
-        return <Calendar className="h-4 w-4 text-gray-600" />
+        return <Calendar className="h-4 w-4 text-muted-foreground" />
     }
   }
 
   const getAmountColor = (type: string) => {
     switch (type) {
       case "income":
-        return "text-green-600"
+        return "text-success-text"
       case "investment":
-        return "text-blue-600"
+        return "text-info-text"
       default:
-        return "text-red-600"
+        return "text-destructive-text"
     }
   }
 
@@ -57,7 +58,11 @@ export default function TransactionList({
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg">{title}</CardTitle>
           {showAddButton && onAddTransaction && (
-            <Button onClick={onAddTransaction} size="sm" className="bg-black hover:bg-gray-800 text-white">
+            <Button
+              onClick={onAddTransaction}
+              size="sm"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
               Add Transaction
             </Button>
           )}
@@ -65,19 +70,31 @@ export default function TransactionList({
       </CardHeader>
       <CardContent>
         {transactions.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">No transactions found.</div>
+          <EmptyState
+            icon={Receipt}
+            compact
+            title="No transactions found"
+            description="Transactions will appear here once they've been added."
+            action={
+              showAddButton && onAddTransaction ? (
+                <Button onClick={onAddTransaction} size="sm" variant="outline">
+                  Add Transaction
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <div className="space-y-4">
             {transactions.map((transaction) => (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                className="flex items-center justify-between p-4 border rounded-lg transition-colors hover:bg-accent"
               >
                 <div className="flex items-center gap-3">
                   {getTransactionIcon(transaction.type)}
                   <div>
                     <div className="font-medium">{transaction.description}</div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       {transaction.category} • {new Date(transaction.date).toLocaleDateString()}
                       {transaction.cardName && ` • ${transaction.cardName}`}
                     </div>
@@ -85,14 +102,10 @@ export default function TransactionList({
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right">
-                    <div className={`font-semibold ${getAmountColor(transaction.type)}`}>
+                    <div className={`font-semibold tnum ${getAmountColor(transaction.type)}`}>
                       ₹{transaction.amount.toLocaleString()}
                     </div>
-                    {transaction.status && (
-                      <Badge variant={transaction.status === "Paid" ? "default" : "secondary"} className="text-xs">
-                        {transaction.status}
-                      </Badge>
-                    )}
+                    {transaction.status && <StatusBadge status={transaction.status} />}
                   </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="sm" onClick={() => onViewTransaction(transaction)}>

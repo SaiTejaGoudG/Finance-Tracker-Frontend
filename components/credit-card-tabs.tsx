@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/components/ui/states"
+import StatusBadge from "@/components/status-badge"
 import { CreditCard, Calendar, IndianRupee } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -35,8 +37,13 @@ export default function CreditCardTabs({ creditCards }: CreditCardTabsProps) {
   if (!creditCards.length) {
     return (
       <Card>
-        <CardContent className="p-6 text-center">
-          <p className="text-muted-foreground">No credit cards found.</p>
+        <CardContent className="p-6">
+          <EmptyState
+            icon={CreditCard}
+            compact
+            title="No credit cards found"
+            description="Add a credit card to start tracking its statements here."
+          />
         </CardContent>
       </Card>
     )
@@ -59,7 +66,9 @@ export default function CreditCardTabs({ creditCards }: CreditCardTabsProps) {
               onClick={() => setActiveCard(card.id)}
               className={cn(
                 "flex-1 py-3 px-4 text-center font-medium transition-colors border-r last:border-r-0",
-                activeCard === card.id ? "bg-black text-white" : "bg-white text-gray-600 hover:bg-gray-50",
+                activeCard === card.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-accent",
               )}
             >
               {card.name}
@@ -72,7 +81,7 @@ export default function CreditCardTabs({ creditCards }: CreditCardTabsProps) {
         {activeCardData && (
           <div className="p-4">
             <div className="mb-4">
-              <div className="text-lg font-semibold">Total: ₹{activeCardData.totalAmount.toLocaleString()}</div>
+              <div className="text-lg font-semibold tnum">Total: ₹{activeCardData.totalAmount.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">{activeCardData.transactions.length} transactions</div>
             </div>
 
@@ -94,13 +103,11 @@ export default function CreditCardTabs({ creditCards }: CreditCardTabsProps) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-red-600 flex items-center">
+                    <div className="flex items-center font-semibold tnum text-destructive-text">
                       <IndianRupee className="w-4 h-4" />
                       {transaction.amount.toLocaleString()}
                     </div>
-                    <Badge variant={transaction.status === "Paid" ? "default" : "secondary"} className="text-xs">
-                      {transaction.status}
-                    </Badge>
+                    <StatusBadge status={transaction.status} className="mt-1" />
                   </div>
                 </div>
               ))}

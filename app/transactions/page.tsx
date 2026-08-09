@@ -4,19 +4,20 @@ import { apiUrl } from "@/lib/api"
 import { apiClient } from "@/lib/apiClient"
 import { useState, useEffect, useRef } from "react"
 import { format, parseISO } from "date-fns"
-import { ArrowDownIcon, ArrowUpIcon, Search, Plus, ReceiptText } from "lucide-react"
-import { getCategoryMeta, getTypeColor } from "@/lib/tx-meta"
+import { Plus, ReceiptText, SearchX, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { toTransactionId, SYNTHETIC_ROW_MESSAGE } from "@/lib/tx-id"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import StatusBadge from "@/components/status-badge"
-import TransactionActions from "@/components/transaction-actions"
 import TransactionViewDialog from "@/components/transaction-view-dialog"
+import TransactionsTable from "@/components/transactions/transactions-table"
+import TransactionsToolbar, {
+  BulkActionBar,
+  type Density,
+} from "@/components/transactions/transactions-toolbar"
+import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states"
 import TransactionForm from "@/components/transaction-form"
 import MonthCalendar from "@/components/month-calendar"
 import LayoutWrapper from "@/components/layout-wrapper"
@@ -139,6 +140,11 @@ function TransactionsPageContent() {
   // Recurring modals
   const [showRecurringManage, setShowRecurringManage] = useState(false)
   const [showRecurringGenerate, setShowRecurringGenerate] = useState(false)
+
+  // Table view preferences + bulk selection
+  const [density, setDensity] = useState<Density>("comfortable")
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   // Use ref to prevent duplicate API calls
   const isFetchingRef = useRef(false)
@@ -342,6 +348,19 @@ function TransactionsPageContent() {
   }
 
   const handleMakePayment = async (transaction: Transaction) => {
+    // EMI rows are projected from the loan schedule and have no transactions
+    // row. Without this guard parseInt("emi_…") yields NaN, JSON turns that
+    // into null, and the API rejects it with an unhelpful 400.
+    const txnId = toTransactionId(transaction.id)
+    if (txnId === null) {
+      toast({
+        title: "Can't update this row",
+        description: SYNTHETIC_ROW_MESSAGE,
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const response = await apiClient(apiUrl("transaction/update-status"), {
         method: "PUT",
@@ -349,7 +368,7 @@ function TransactionsPageContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: Number.parseInt(transaction.id),
+          id: txnId,
           status: "Paid",
         }),
       })
@@ -383,6 +402,19 @@ function TransactionsPageContent() {
   }
 
   const handleRevokePayment = async (transaction: Transaction) => {
+    // EMI rows are projected from the loan schedule and have no transactions
+    // row. Without this guard parseInt("emi_…") yields NaN, JSON turns that
+    // into null, and the API rejects it with an unhelpful 400.
+    const txnId = toTransactionId(transaction.id)
+    if (txnId === null) {
+      toast({
+        title: "Can't update this row",
+        description: SYNTHETIC_ROW_MESSAGE,
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const response = await apiClient(apiUrl("transaction/update-status"), {
         method: "PUT",
@@ -390,7 +422,7 @@ function TransactionsPageContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: Number.parseInt(transaction.id),
+          id: txnId,
           status: "Pending",
         }),
       })
@@ -461,6 +493,73 @@ function TransactionsPageContent() {
     }
   }
 
+  // ─── Bulk selection ─────────────────────────────────────────────────────────
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  /** Select-all applies to the currently filtered rows, minus synthetic EMI rows. */
+  const toggleSelectAll = () => {
+    const selectable = legacyTransactions
+      .filter((t) => !t.id.startsWith("emi_"))
+      .map((t) => t.id)
+
+    setSelectedIds((prev) => {
+      const allOn = selectable.length > 0 && selectable.every((id) => prev.has(id))
+      return allOn ? new Set() : new Set(selectable)
+    })
+  }
+
+  /**
+   * Bulk delete. Synthetic EMI rows are never selectable, so every id here is
+   * a real record. Requests run in parallel; partial failures are reported.
+   */
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    setBulkBusy(true)
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          apiClient(apiUrl(`transaction/delete/${id}`), { method: "DELETE" }).then((r) => {
+            if (!r.ok) throw new Error(`Failed to delete ${id}`)
+            return r
+          }),
+        ),
+      )
+
+      const failed = results.filter((r) => r.status === "rejected").length
+      const succeeded = ids.length - failed
+
+      if (succeeded > 0) {
+        toast({
+          title: `${succeeded} transaction${succeeded > 1 ? "s" : ""} deleted`,
+          description: failed > 0 ? `${failed} could not be deleted.` : undefined,
+          variant: failed > 0 ? "destructive" : "default",
+        })
+      } else {
+        toast({
+          title: "Delete failed",
+          description: "None of the selected transactions could be deleted.",
+          variant: "destructive",
+        })
+      }
+
+      clearSelection()
+      refreshTransactions()
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   // Get available categories for the current tab
   const getAvailableCategories = (): string[] => {
     let categories: string[] = []
@@ -502,6 +601,18 @@ function TransactionsPageContent() {
 
   // Convert to legacy format for display
   const legacyTransactions = sortedTransactions.map(convertApiTransactionToLegacy)
+
+  // Whether the empty state should read "no matches" vs "nothing here yet"
+  const hasActiveFilters =
+    searchTerm.trim().length > 0 ||
+    (!!selectedCategory && selectedCategory !== "All") ||
+    !!selectedCard
+
+  const clearAllFilters = () => {
+    setSearchTerm("")
+    handleCategoryFilter("All")
+    setSelectedCard(null)
+  }
 
   // Credit card summary strip — only when a specific card is selected
   const creditCardSummary = (() => {
@@ -578,336 +689,180 @@ function TransactionsPageContent() {
         onGenerated={refreshTransactions}
       />
 
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">All Transactions</h1>
+      {/* Page header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            All Transactions
+          </h1>
           <MonthCalendar onMonthSelect={handleMonthSelect} defaultMonth={selectedMonth} />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowRecurringManage(true)}>
-            <LucideIcons.Repeat className="h-4 w-4 mr-2" /> Manage Recurring
+            <LucideIcons.Repeat className="mr-1.5 h-4 w-4" />
+            Manage recurring
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowRecurringGenerate(true)}>
-            <LucideIcons.Zap className="h-4 w-4 mr-2" /> Generate Recurring
+            <LucideIcons.Zap className="mr-1.5 h-4 w-4" />
+            Generate recurring
           </Button>
         </div>
       </div>
 
-      {/* Debug Info */}
-      {/* <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-        🔍 Debug: Found {transactions.length} transactions | Total: ₹{totalAmount.toLocaleString("en-IN")} | Tab:{" "}
-        {activeTab} | Category: {selectedCategory}
-      </div> */}
-
-      {/* Error Banner */}
-      {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-red-800">API Error</div>
-                <div className="text-sm text-red-700">{error}</div>
-                <div className="text-xs text-red-600 mt-1">Please check your internet connection and try again</div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const transactionType = getTransactionTypeForTab(activeTab)
-                  const month = selectedMonth.getMonth() + 1
-                  const year = selectedMonth.getFullYear()
-                  const cardId =
-                    activeTab === "credit-cards" && selectedCard && selectedCard !== "all"
-                      ? getCardIdFromName(selectedCard)
-                      : ""
-                  fetchTransactions(transactionType, month, year, selectedCategory, cardId)
-                }}
-              >
-                Retry
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* FIXED: Transaction Type Tabs - Match dashboard structure */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
-        <TabsList className="grid w-full grid-cols-6 bg-muted">
-          <TabsTrigger
-            value="all-transactions"
-            className="data-[state=active]:bg-black data-[state=active]:text-white text-sm"
-          >
-            All Transactions
-          </TabsTrigger>
-          <TabsTrigger value="income" className="data-[state=active]:bg-black data-[state=active]:text-white text-sm">
-            Income
-          </TabsTrigger>
-          <TabsTrigger
-            value="investments"
-            className="data-[state=active]:bg-black data-[state=active]:text-white text-sm"
-          >
-            Investments
-          </TabsTrigger>
-          <TabsTrigger value="expenses" className="data-[state=active]:bg-black data-[state=active]:text-white text-sm">
-            Expenses
-          </TabsTrigger>
-          <TabsTrigger
-            value="credit-cards"
-            className="data-[state=active]:bg-black data-[state=active]:text-white text-sm"
-          >
-            Credit Cards
-          </TabsTrigger>
-          <TabsTrigger
-            value="petty-cash"
-            className="data-[state=active]:bg-black data-[state=active]:text-white text-sm"
-          >
-            Petty Cash
-          </TabsTrigger>
+      {/* Transaction type tabs — underline style, sized to content rather than
+          six stretched full-width segments */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          setActiveTab(value as typeof activeTab)
+          clearSelection()
+        }}
+      >
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+          {(
+            [
+              ["all-transactions", "All"],
+              ["income", "Income"],
+              ["investments", "Investments"],
+              ["expenses", "Expenses"],
+              ["credit-cards", "Credit Cards"],
+              ["petty-cash", "Petty Cash"],
+            ] as const
+          ).map(([value, label]) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className={cn(
+                "relative rounded-none border-b-2 border-transparent bg-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground shadow-none transition-colors",
+                "hover:text-foreground",
+                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none",
+              )}
+            >
+              {label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="text-lg">{getTabTitle()}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {loading
-                      ? "Loading transactions..."
-                      : error
-                        ? "Error loading transactions"
-                        : legacyTransactions.length > 0
-                          ? `Showing ${legacyTransactions.length} transaction${legacyTransactions.length > 1 ? "s" : ""}`
-                          : "No transactions found"}
-                  </CardDescription>
-                </div>
-                <Button onClick={handleAddTransaction} className="bg-black text-white hover:bg-gray-800">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Transaction
-                </Button>
-              </div>
-
-              {/* Credit card summary strip — compact pill, only when a specific card is selected */}
-              {creditCardSummary && (
-                <div className="inline-flex items-center gap-2 mt-3 px-3.5 py-2 bg-muted/70 border rounded-2xl text-sm w-fit">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-md bg-violet-100 text-base select-none">
-                    💳
-                  </span>
-                  <span className="font-semibold text-foreground">{creditCardSummary.cardName}</span>
-                  {creditCardSummary.dueDate && (
+          <Card className="overflow-hidden p-0">
+            {/* Card header: title + count + primary action */}
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight text-foreground">
+                  {getTabTitle()}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {format(selectedMonth, "MMMM yyyy")}
+                  {creditCardSummary && (
                     <>
-                      <span className="text-muted-foreground/50">·</span>
-                      <span className="text-muted-foreground text-xs">
-                        Due: <span className="font-medium text-foreground">{format(parseISO(creditCardSummary.dueDate), "dd MMM yyyy")}</span>
+                      {" · "}
+                      <span className="font-medium text-foreground">
+                        {creditCardSummary.cardName}
+                      </span>
+                      {creditCardSummary.dueDate && (
+                        <> · due {format(parseISO(creditCardSummary.dueDate), "d MMM")}</>
+                      )}
+                      {" · "}
+                      <span className="tnum font-semibold text-foreground">
+                        ₹{creditCardSummary.total.toLocaleString("en-IN")}
                       </span>
                     </>
                   )}
-                  <span className="text-muted-foreground/50">·</span>
-                  <span className="text-muted-foreground text-xs">
-                    Total: <span className="font-semibold text-violet-600">₹{creditCardSummary.total.toLocaleString("en-IN")}</span>
-                  </span>
-                </div>
-              )}
-
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search transactions..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="w-full sm:w-48">
-                  <SearchableSelect
-                    value={selectedCategory}
-                    onValueChange={handleCategoryFilter}
-                    disabled={loading}
-                    placeholder="Filter by category"
-                    searchPlaceholder="Search category…"
-                    options={getAvailableCategories().map((cat) => ({ value: cat, label: cat }))}
-                  />
-                </div>
-
-                {/* Credit Card Filter */}
-                {activeTab === "credit-cards" && creditCards.length > 0 && (
-                  <div className="w-full sm:w-48">
-                    <SearchableSelect
-                      value={selectedCard || "all"}
-                      onValueChange={(value) => setSelectedCard(value === "all" ? null : value)}
-                      disabled={loading}
-                      placeholder="Filter by card"
-                      searchPlaceholder="Search card…"
-                      options={[
-                        { value: "all", label: "All Cards" },
-                        ...creditCards.map((card) => ({ value: card, label: card })),
-                      ]}
-                    />
-                  </div>
-                )}
+                </p>
               </div>
-            </CardHeader>
+              <Button onClick={handleAddTransaction} size="sm">
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add transaction
+              </Button>
+            </div>
 
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading transactions from API...</p>
-                  </div>
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <p className="text-red-600 mb-2">Failed to load transactions</p>
-                    <p className="text-sm text-muted-foreground">{error}</p>
-                  </div>
-                </div>
-              ) : legacyTransactions.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[35%]">Transaction</TableHead>
-                      <TableHead className="w-[14%]">
-                        <Button
-                          variant="ghost"
-                          className="flex items-center p-0 font-medium"
-                          onClick={() => toggleSort("date")}
-                        >
-                          Date
-                          {sortBy === "date" &&
-                            (sortOrder === "asc" ? (
-                              <ArrowUpIcon className="ml-1 h-4 w-4" />
-                            ) : (
-                              <ArrowDownIcon className="ml-1 h-4 w-4" />
-                            ))}
-                        </Button>
-                      </TableHead>
-                      {/* Due Date: only for Expenses tab */}
-                      {activeTab === "expenses" && (
-                        <TableHead className="w-[12%]">Due Date</TableHead>
-                      )}
-                      <TableHead className="w-[10%] text-center">Status</TableHead>
-                      <TableHead className="w-[15%]">
-                        <Button
-                          variant="ghost"
-                          className="flex items-center p-0 font-medium"
-                          onClick={() => toggleSort("amount")}
-                        >
-                          Amount
-                          {sortBy === "amount" &&
-                            (sortOrder === "asc" ? (
-                              <ArrowUpIcon className="ml-1 h-4 w-4" />
-                            ) : (
-                              <ArrowDownIcon className="ml-1 h-4 w-4" />
-                            ))}
-                        </Button>
-                      </TableHead>
-                      {/* Card column only when All Cards selected */}
-                      {activeTab === "credit-cards" && !selectedCard && (
-                        <TableHead className="w-[12%]">Card</TableHead>
-                      )}
-                      <TableHead className="w-[8%] text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {legacyTransactions.map((transaction) => {
-                      const { emoji, color } = getCategoryMeta(transaction.category)
-                      const colors = getTypeColor(transaction.type)
-                      return (
-                        <TableRow key={transaction.id} className="hover:bg-muted/40 transition-colors">
-                          {/* Description + iOS emoji icon */}
-                          <TableCell>
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span
-                                className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl text-lg select-none"
-                                style={{ backgroundColor: color }}
-                              >
-                                {emoji}
-                              </span>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{transaction.description}</p>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <p className="text-xs text-muted-foreground truncate">{transaction.category}</p>
-                                  {/* Card badge for credit-type in All Transactions */}
-                                  {activeTab === "all-transactions" && transaction.type === "credit" && transaction.cardName && (
-                                    <span className="inline-flex items-center gap-0.5 text-xs text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                                      💳 {transaction.cardName}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </TableCell>
+            {/* Bulk action bar — replaces the toolbar while rows are selected */}
+            {selectedIds.size > 0 ? (
+              <BulkActionBar
+                count={selectedIds.size}
+                onClear={clearSelection}
+                actions={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={bulkBusy}
+                    onClick={handleBulkDelete}
+                    className="h-7 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    {bulkBusy ? "Deleting…" : "Delete"}
+                  </Button>
+                }
+              />
+            ) : (
+              <TransactionsToolbar
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                selectedCategory={selectedCategory}
+                onCategoryChange={handleCategoryFilter}
+                categories={getAvailableCategories()}
+                showCardFilter={activeTab === "credit-cards"}
+                selectedCard={selectedCard}
+                onCardChange={setSelectedCard}
+                cards={creditCards}
+                density={density}
+                onDensityChange={setDensity}
+                resultCount={legacyTransactions.length}
+                totalCount={transactions.length}
+                disabled={loading}
+              />
+            )}
 
-                          {/* Date */}
-                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                            {transaction.date ? format(parseISO(transaction.date), "dd MMM yyyy") : "—"}
-                          </TableCell>
-
-                          {/* Due Date — only Expenses tab */}
-                          {activeTab === "expenses" && (
-                            <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                              {transaction.dueDate ? format(parseISO(transaction.dueDate), "dd MMM yyyy") : "—"}
-                            </TableCell>
-                          )}
-
-                          {/* Status */}
-                          <TableCell className="text-center">
-                            <StatusBadge status={transaction.status || "Pending"} />
-                          </TableCell>
-
-                          {/* Amount — colored by type */}
-                          <TableCell className="whitespace-nowrap">
-                            <span className={cn("text-sm font-semibold", colors.amountText)}>
-                              {colors.amountPrefix}₹{transaction.amount.toLocaleString("en-IN")}
-                            </span>
-                          </TableCell>
-
-                          {/* Card column — only when All Cards is selected */}
-                          {activeTab === "credit-cards" && !selectedCard && (
-                            <TableCell>
-                              {transaction.cardName
-                                ? <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{transaction.cardName}</span>
-                                : <span className="text-muted-foreground">—</span>}
-                            </TableCell>
-                          )}
-
-                          {/* Actions */}
-                          <TableCell className="text-right">
-                            <TransactionActions
-                              transaction={transaction}
-                              onView={handleViewTransaction}
-                              onEdit={handleEditTransaction}
-                              onDelete={handleDeleteTransaction}
-                              showEditOption={!transaction.id.startsWith("emi_")}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-muted mb-4">
-                    <ReceiptText className="h-7 w-7 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground mb-1">
-                    {searchTerm ? "No results found" : "No transactions yet"}
-                  </p>
-                  <p className="text-xs text-muted-foreground max-w-[220px]">
-                    {searchTerm
-                      ? `Nothing matched "${searchTerm}". Try a different search or clear your filters.`
-                      : "No transactions found for the selected period or filters."}
-                  </p>
-                </div>
-              )}
-            </CardContent>
+            {/* Body */}
+            {loading ? (
+              <SkeletonRows rows={8} columns={5} />
+            ) : error ? (
+              <ErrorState
+                title="Couldn't load transactions"
+                description={error}
+                onRetry={refreshTransactions}
+              />
+            ) : legacyTransactions.length > 0 ? (
+              <TransactionsTable
+                transactions={legacyTransactions}
+                density={density}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onToggleSort={toggleSort}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
+                showDueDate={activeTab === "expenses"}
+                showCardColumn={activeTab === "credit-cards" && !selectedCard}
+                showCardBadge={activeTab === "all-transactions"}
+                onView={handleViewTransaction}
+                onEdit={handleEditTransaction}
+                onDelete={handleDeleteTransaction}
+              />
+            ) : hasActiveFilters ? (
+              <EmptyState
+                icon={SearchX}
+                title="No matching transactions"
+                description={`Nothing matched your current filters. Try broadening your search.`}
+                action={
+                  <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                    Clear filters
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={ReceiptText}
+                title="No transactions yet"
+                description={`Nothing recorded for ${format(selectedMonth, "MMMM yyyy")}. Add your first transaction to get started.`}
+                action={
+                  <Button size="sm" onClick={handleAddTransaction}>
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    Add transaction
+                  </Button>
+                }
+              />
+            )}
           </Card>
         </TabsContent>
       </Tabs>

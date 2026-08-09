@@ -129,7 +129,7 @@ export default function AIChatbot({ filters }: AIChatbotProps) {
           "fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-200",
           open
             ? "bg-foreground text-background"
-            : "bg-violet-600 text-white hover:bg-violet-700",
+            : "bg-info text-info-foreground hover:bg-info/90",
         )}
       >
         {open ? <X className="h-5 w-5" /> : <MessageCircle className="h-6 w-6" />}
@@ -139,9 +139,9 @@ export default function AIChatbot({ filters }: AIChatbotProps) {
       {open && (
         <div className="fixed bottom-24 right-6 z-50 w-[360px] max-h-[560px] flex flex-col rounded-2xl border bg-background shadow-2xl overflow-hidden">
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30">
-            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/50">
-              <Sparkles className="h-4 w-4 text-violet-600" />
+          <div className="flex items-center gap-3 px-4 py-3 border-b bg-gradient-to-r from-info-subtle to-muted">
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-info-subtle">
+              <Sparkles className="h-4 w-4 text-info-subtle-foreground" />
             </div>
             <div>
               <p className="text-sm font-semibold">Finance Assistant</p>
@@ -174,7 +174,7 @@ export default function AIChatbot({ filters }: AIChatbotProps) {
                 <div className={cn(
                   "flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5",
                   msg.role === "user"
-                    ? "bg-violet-600 text-white"
+                    ? "bg-info text-info-foreground"
                     : "bg-muted text-muted-foreground",
                 )}>
                   {msg.role === "user"
@@ -185,7 +185,7 @@ export default function AIChatbot({ filters }: AIChatbotProps) {
                 <div className={cn(
                   "rounded-2xl px-3.5 py-2.5 text-sm max-w-[270px] leading-relaxed",
                   msg.role === "user"
-                    ? "bg-violet-600 text-white rounded-tr-sm"
+                    ? "bg-info text-info-foreground rounded-tr-sm"
                     : "bg-muted rounded-tl-sm",
                 )}>
                   {msg.content}
@@ -215,12 +215,12 @@ export default function AIChatbot({ filters }: AIChatbotProps) {
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input) } }}
               placeholder="Ask about your finances…"
               disabled={thinking}
-              className="flex-1 text-sm rounded-xl border bg-muted/40 px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-50"
+              className="flex-1 text-sm rounded-xl border bg-muted/40 px-3 py-2 outline-none focus:ring-2 focus:ring-info/30 disabled:opacity-50"
             />
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || thinking}
-              className="flex items-center justify-center w-9 h-9 rounded-xl bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+              className="flex items-center justify-center w-9 h-9 rounded-xl bg-info text-info-foreground hover:bg-info/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
             >
               <Send className="h-4 w-4" />
             </button>
