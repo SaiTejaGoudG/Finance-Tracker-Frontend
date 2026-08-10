@@ -29,6 +29,11 @@ import { CenteredSpinner, ErrorState } from "@/components/ui/states"
 import { CreditCard, Target } from "lucide-react"
 import TransactionTabs from "./transaction-tabs"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import {
+  incomeCategories as INCOME_NAMES,
+  expenseCategories as EXPENSE_NAMES,
+  investmentCategories as INVESTMENT_NAMES,
+} from "@/lib/data"
 
 // API Response Types for Dashboard API ONLY
 export type ApiTransaction = {
@@ -100,38 +105,43 @@ export type Transaction = {
   payment_id?: number // Added payment_id field for credit card transactions
 }
 
-// Categories
-export const expenseCategories = [
-  { name: "Food", icon: "utensils" },
-  { name: "Transport", icon: "car" },
-  { name: "Utilities", icon: "zap" },
-  { name: "Entertainment", icon: "tv" },
-  { name: "Shopping", icon: "shopping-bag" },
-  { name: "Healthcare", icon: "heart" },
-  { name: "Education", icon: "book-open" },
-  { name: "Housing", icon: "home" },
-  { name: "Personal Care", icon: "user" },
-  { name: "Travel", icon: "map" },
-  { name: "Gifts", icon: "gift" },
-  { name: "Chitti", icon: "landmark" },
-  { name: "Credit Card Payment", icon: "credit-card" },
-  { name: "Freelancing", icon: "briefcase" },
-  { name: "Debt", icon: "credit-card" },
-  { name: "EMI", icon: "calendar" },
-  { name: "Other Expenses", icon: "more-horizontal" },
-]
+// ─── Categories ───────────────────────────────────────────────────────────────
+// Derived from lib/data.ts rather than duplicated. These previously drifted:
+// lib/data.ts had 34 expense categories, this file had 17, and adding one meant
+// editing both. The {name, icon} shape is kept because callers do
+// `.find(c => c.name === …)` and `.map(c => c.name)`.
 
-export const incomeCategories = [
-  { name: "Salary", icon: "briefcase" },
-  { name: "Interest", icon: "percent" },
-  { name: "Freelancing", icon: "laptop" },
-  { name: "Others", icon: "plus-circle" },
-]
+const CATEGORY_ICONS: Record<string, string> = {
+  Airbnb: "home",
+  Food: "utensils",
+  Transport: "car",
+  Utilities: "zap",
+  Entertainment: "tv",
+  Shopping: "shopping-bag",
+  Healthcare: "heart",
+  Education: "book-open",
+  Housing: "home",
+  "Personal Care": "user",
+  Travel: "map",
+  Gifts: "gift",
+  Chitti: "landmark",
+  "Credit Card Payment": "credit-card",
+  Freelancing: "briefcase",
+  Debt: "credit-card",
+  EMI: "calendar",
+  "Other Expenses": "more-horizontal",
+  Salary: "briefcase",
+  Interest: "percent",
+  Others: "plus-circle",
+  SIP: "trending-up",
+}
 
-export const investmentCategories = [
-  { name: "Chitti", icon: "landmark" },
-  { name: "SIP", icon: "trending-up" },
-]
+const withIcons = (names: string[]) =>
+  names.map((name) => ({ name, icon: CATEGORY_ICONS[name] ?? "circle" }))
+
+export const expenseCategories = withIcons(EXPENSE_NAMES)
+export const incomeCategories = withIcons(INCOME_NAMES)
+export const investmentCategories = withIcons(INVESTMENT_NAMES)
 
 // Convert API transaction to legacy format for compatibility
 const convertApiTransactionToLegacy = (
