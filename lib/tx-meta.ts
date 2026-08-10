@@ -14,6 +14,9 @@ export interface CategoryMeta {
 }
 
 const CATEGORY_META: Record<string, CategoryMeta> = {
+  // ── Cross-type (offered under income, expense, investment and asset) ──────
+  Airbnb:                 { emoji: "🏡", color: "#e11d48" }, // rose-600
+
   // ── Income ────────────────────────────────────────────────────────────────
   Salary:                 { emoji: "💼", color: "#3b82f6" }, // blue-500
   Freelancing:            { emoji: "💻", color: "#6366f1" }, // indigo-500
@@ -83,7 +86,7 @@ export function getCategoryMeta(category: string): CategoryMeta {
 
 // ─── Transaction type metadata ────────────────────────────────────────────────
 
-export type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "summary"
+export type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "asset" | "summary"
 
 export interface TypeColor {
   emoji: string
@@ -148,6 +151,15 @@ export const TYPE_COLORS: Record<TxType, TypeColor> = {
     chartVar:     "hsl(var(--chart-5))",
     amountPrefix: "↑",
     label:        "Investment",
+  },
+  asset: {
+    emoji:        "🏛️",
+    iconColor:    "#0d9488", // teal-600
+    amountText:   "text-foreground",
+    badgeClass:   "bg-secondary text-secondary-foreground",
+    chartVar:     "hsl(var(--chart-1))",
+    amountPrefix: "",
+    label:        "Asset",
   },
   summary: {
     emoji:        "📊",

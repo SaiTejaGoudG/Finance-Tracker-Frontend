@@ -6,6 +6,8 @@
  * Design notes:
  * - Rows are grouped by day with a subtotal in each group header, because the
  *   user's question is usually "what happened on the 21st", not "row 47".
+ *   Each day header is a collapse toggle — closing one hides its rows so a
+ *   long day list doesn't bury the days actually being compared.
  * - The header is sticky so column meaning survives a long scroll.
  * - Row actions are hover/focus-revealed (.row-reveal) rather than a permanent
  *   low-contrast "..." — the whole row is also clickable to view.
@@ -14,12 +16,13 @@
  *   excluded from selection and from edit/delete.
  */
 
+import { useState } from "react"
 import { format, parseISO } from "date-fns"
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import StatusBadge from "@/components/status-badge"
 import TransactionActions from "@/components/transaction-actions"
-import { getCategoryMeta, getTypeColor } from "@/lib/tx-meta"
+import { getCategoryMeta, getTypeColor, type TxType } from "@/lib/tx-meta"
 import { groupByDate } from "@/lib/group-transactions"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/app/transactions/page"
@@ -27,6 +30,21 @@ import type { Transaction as ActionTransaction } from "@/components/dashboard"
 import type { Density } from "./transactions-toolbar"
 
 const isSynthetic = (id: string) => id.startsWith("emi_")
+
+/**
+ * The row's TRUE type for display purposes — a Credit Card transaction is a
+ * payment method, not a purpose, so a card swipe tagged purpose=Investment
+ * (or Asset) should read as that, not as a generic "Credit Card" row. This
+ * is what actually answers "is this Income/Expense/Investment?" at a glance;
+ * without it, Credit Card and Investment rows even share the same info-blue
+ * color, so they're impossible to tell apart from amount color alone.
+ */
+function getEffectiveTypeKey(t: Transaction): TxType {
+  if (t.type === "credit" && (t.purpose === "Investment" || t.purpose === "Asset")) {
+    return t.purpose === "Investment" ? "investment" : "asset"
+  }
+  return t.type as TxType
+}
 
 /**
  * app/transactions defines ownerType/expenseType as `T | null`, while the
@@ -130,6 +148,22 @@ export default function TransactionsTable({
   onEdit,
   onDelete,
 }: TransactionsTableProps) {
+  // Which day groups are collapsed — closed groups keep their header (so they
+  // can be reopened) but hide their rows. Empty set = everything expanded.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
   // Grouping only makes sense while sorted by date; amount-sorted views stay flat
   const grouped = sortBy === "date"
   const groups = grouped
@@ -233,20 +267,41 @@ export default function TransactionsTable({
           </tr>
         </thead>
 
-        {groups.map((group) => (
+        {groups.map((group) => {
+          const collapsed = grouped && collapsedGroups.has(group.key)
+
+          return (
           <tbody key={group.key} className="divide-y divide-border">
-            {/* Day header with subtotal */}
+            {/* Day header with subtotal — click/toggle to collapse this day */}
             {grouped && (
               <tr className="bg-muted/40">
-                <td colSpan={colCount + 1} className="px-4 py-1.5">
-                  <div className="flex items-baseline justify-between gap-3">
+                <td colSpan={colCount + 1} className="p-0">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.key)}
+                    aria-expanded={!collapsed}
+                    className="flex w-full items-baseline justify-between gap-3 px-4 py-1.5 text-left transition-colors hover:bg-muted/70"
+                  >
                     <span className="flex items-baseline gap-2">
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0 self-center text-muted-foreground transition-transform",
+                          collapsed && "-rotate-90",
+                        )}
+                        aria-hidden="true"
+                      />
                       <span className="text-xs font-medium text-foreground">
                         {group.label}
                       </span>
                       {group.weekday && (
                         <span className="text-xs text-muted-foreground">
                           {group.weekday}
+                        </span>
+                      )}
+                      {collapsed && (
+                        <span className="text-xs text-muted-foreground">
+                          · {group.items.length}{" "}
+                          {group.items.length === 1 ? "transaction" : "transactions"}
                         </span>
                       )}
                     </span>
@@ -271,14 +326,15 @@ export default function TransactionsTable({
                         {fmtINR(group.net)}
                       </span>
                     </span>
-                  </div>
+                  </button>
                 </td>
               </tr>
             )}
 
-            {group.items.map((t) => {
+            {!collapsed && group.items.map((t) => {
               const { emoji, color } = getCategoryMeta(t.category)
               const type = getTypeColor(t.type)
+              const effectiveType = getTypeColor(getEffectiveTypeKey(t))
               const synthetic = isSynthetic(t.id)
               const selected = selectedIds.has(t.id)
 
@@ -320,6 +376,14 @@ export default function TransactionsTable({
                           {t.description}
                         </p>
                         <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-xs font-medium",
+                              effectiveType.badgeClass,
+                            )}
+                          >
+                            {effectiveType.label}
+                          </span>
                           <span className="truncate text-xs text-muted-foreground">
                             {t.category}
                           </span>
@@ -370,10 +434,10 @@ export default function TransactionsTable({
                     <span
                       className={cn(
                         "tnum whitespace-nowrap font-semibold",
-                        type.amountText,
+                        effectiveType.amountText,
                       )}
                     >
-                      {type.amountPrefix}
+                      {effectiveType.amountPrefix}
                       {fmtINR(t.amount)}
                     </span>
                   </td>
@@ -410,7 +474,8 @@ export default function TransactionsTable({
               )
             })}
           </tbody>
-        ))}
+          )
+        })}
       </table>
     </div>
   )
