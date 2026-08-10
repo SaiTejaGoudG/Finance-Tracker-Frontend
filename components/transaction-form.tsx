@@ -14,7 +14,8 @@ import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee } from "lucide
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { getCategoryMeta } from "@/lib/tx-meta"
-import { incomeCategories, expenseCategories, investmentCategories, assetCategories } from "@/lib/data"
+import { useToast } from "@/components/ui/use-toast"
+import { useCategories, type CategoryType } from "@/hooks/use-categories"
 
 type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "asset"
 type StatusType = "Pending" | "Paid"
@@ -31,6 +32,7 @@ type EditTransaction = {
   cardName?: string
   ownerType?: string | null
   expenseType?: "fixed" | "variable" | null
+  purpose?: "Expense" | "Investment" | "Asset" | null
 }
 
 type Props = {
@@ -42,16 +44,28 @@ type Props = {
 // API-normalized card item
 type CreditCardItem = { id: number; card_name: string }
 
-// Category sets
-const INCOME_CATEGORIES     = [...incomeCategories].sort()
-const EXPENSE_CATEGORIES    = [...expenseCategories].sort()
-const INVESTMENT_CATEGORIES = [...investmentCategories].sort()
-const ASSET_CATEGORIES      = [...assetCategories].sort()
+// The form's local TxType -> the transaction_type the categories API stores.
+// Credit-card and petty-cash spending is categorised the same way as expenses.
+const CATEGORY_TYPE: Record<TxType, CategoryType> = {
+  income:       "Income",
+  expense:      "Expense",
+  credit:       "Credit Card",
+  "petty-cash": "Petty Cash",
+  investment:   "Investment",
+  asset:        "Asset",
+}
 
 const OWNER_TYPES = ["self", "brother", "friend", "other"]
 const EXPENSE_TYPES: Array<"fixed" | "variable"> = ["fixed", "variable"]
 
+// Credit Card is a payment method, not a spending purpose — a card swipe
+// could be an ordinary Expense, a business Investment, or an Asset
+// purchase. Only shown for Credit Card transactions; defaults to Expense
+// so every existing flow behaves exactly as before unless explicitly changed.
+const CREDIT_PURPOSES: Array<"Expense" | "Investment" | "Asset"> = ["Expense", "Investment", "Asset"]
+
 export default function TransactionForm({ onSubmit, onCancel, editTransaction = null }: Props) {
+  const { toast } = useToast()
   // Core state
   const [type, setType] = useState<TxType>(editTransaction?.type ?? "expense")
   const [description, setDescription] = useState<string>(editTransaction?.description ?? "")
@@ -60,6 +74,9 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   const [status, setStatus] = useState<StatusType>(editTransaction?.status ?? "Pending")
   const [ownerType, setOwnerType] = useState<string>(editTransaction?.ownerType ?? "self")
   const [expenseType, setExpenseType] = useState<"fixed" | "variable">(editTransaction?.expenseType ?? "variable")
+  const [purpose, setPurpose] = useState<"Expense" | "Investment" | "Asset">(
+    editTransaction?.purpose ?? "Expense",
+  )
   const [dateOpen, setDateOpen] = useState(false)
   const [dueDateOpen, setDueDateOpen] = useState(false)
   const [date, setDate] = useState<Date>(editTransaction?.date ? new Date(editTransaction.date) : new Date())
@@ -73,25 +90,47 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   const [selectedCardId, setSelectedCardId] = useState<string>("")
   const [selectedCardName, setSelectedCardName] = useState<string>(editTransaction?.cardName ?? "")
 
-  // Derived
-  const categories = useMemo(() => {
-    switch (type) {
-      case "income":      return INCOME_CATEGORIES
-      case "investment":  return INVESTMENT_CATEGORIES
-      case "asset":       return ASSET_CATEGORIES
-      default:            return EXPENSE_CATEGORIES
+  // Built-in categories merged with the user's custom ones for this type
+  const {
+    options: categories,
+    createCategory,
+  } = useCategories(CATEGORY_TYPE[type])
+  const [creatingCategory, setCreatingCategory] = useState(false)
+
+  /** Save a typed-in category, then select it. */
+  const handleCreateCategory = async (name: string) => {
+    setCreatingCategory(true)
+    try {
+      const created = await createCategory(name)
+      if (created) {
+        setCategory(created)
+        toast({
+          title: "Category added",
+          description: `"${created}" is now available for ${CATEGORY_TYPE[type]} transactions.`,
+        })
+      }
+    } catch (e) {
+      toast({
+        title: "Couldn't add category",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setCreatingCategory(false)
     }
-  }, [type])
+  }
 
   const showExpenseType      = type === "expense" || type === "credit"
   const showDueDate          = type === "expense"
   const showCardSelect       = type === "credit"
   const showStatus           = type !== "credit" && type !== "petty-cash" && type !== "asset"
+  const showPurposeSelect    = type === "credit"
 
   // Flags to completely hide fields from UI based on transaction type
   const showExpenseTypeField = type === "expense" || type === "credit"
   const showDueDateField     = type === "expense"
   const showStatusField      = type !== "credit" && type !== "petty-cash" && type !== "asset"
+  const showPurposeField     = type === "credit"
 
   // Fetch credit cards from API using exact shape: data.data.data[]
   const fetchCards = async () => {
@@ -210,6 +249,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
       const name = (id ? cards.find((c) => c.id === id)?.card_name : selectedCardName) || selectedCardName || null
       body.card_id = id
       body.card_name = name
+      body.purpose = purpose
     }
 
     // Choose endpoint based on edit
@@ -317,7 +357,11 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
             value={category}
             onValueChange={setCategory}
             placeholder="Select category"
-            searchPlaceholder="Search category…"
+            searchPlaceholder="Search or type a new category…"
+            emptyText="No matching category."
+            onCreateOption={handleCreateCategory}
+            createLabel={(v) => `Add "${v}" as a new category`}
+            creating={creatingCategory}
             options={categories.map((c) => {
               const { emoji, color } = getCategoryMeta(c)
               return {
@@ -455,6 +499,26 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
               options={EXPENSE_TYPES.map((t) => ({
                 value: t,
                 label: t.charAt(0).toUpperCase() + t.slice(1),
+                icon: <Layers className="h-4 w-4 text-muted-foreground" />,
+              }))}
+            />
+          </div>
+        )}
+
+        {/* Credit Card is a payment method, not a purpose — this says what
+            the swipe was actually for, so a business purchase on a card
+            doesn't silently count as personal spending. */}
+        {showPurposeField && (
+          <div className="space-y-1.5">
+            <Label>Purpose</Label>
+            <SearchableSelect
+              value={purpose}
+              onValueChange={(v) => setPurpose(v as "Expense" | "Investment" | "Asset")}
+              placeholder="Select purpose"
+              searchPlaceholder="Search purpose…"
+              options={CREDIT_PURPOSES.map((p) => ({
+                value: p,
+                label: p,
                 icon: <Layers className="h-4 w-4 text-muted-foreground" />,
               }))}
             />

@@ -41,6 +41,10 @@ type ApiTransaction = {
   card_name: string | null
   owner_type?: string | null
   expense_type?: string | null
+  // Only meaningful on Credit Card rows — what the card swipe was actually
+  // for (Expense/Investment/Asset), since Credit Card is a payment method
+  // rather than a spending purpose.
+  purpose?: "Expense" | "Investment" | "Asset" | null
 }
 
 type TransactionsListingResponse = {
@@ -50,6 +54,9 @@ type TransactionsListingResponse = {
     status: boolean
     data: ApiTransaction[] // The actual transactions array is here
     totalAmount: number
+    /** Only present for the All Transactions view (no transaction_type filter) */
+    totalIncome?: number
+    totalOutflow?: number
     pagination: {
       total: number
       currentPage: number
@@ -72,6 +79,7 @@ export type Transaction = {
   cardName?: string
   ownerType?: string | null
   expenseType?: "fixed" | "variable" | null
+  purpose?: "Expense" | "Investment" | "Asset" | null
   isSummary?: boolean
   summaryType?: "credit" | "petty-cash" | "investment"
 }
@@ -107,6 +115,7 @@ const convertApiTransactionToLegacy = (apiTransaction: ApiTransaction): Transact
     cardName: apiTransaction.card_name || undefined,
     ownerType: apiTransaction.owner_type ?? "self",
     expenseType: (apiTransaction.expense_type as "fixed" | "variable" | null) ?? null,
+    purpose: apiTransaction.purpose ?? null,
   }
 }
 
@@ -118,7 +127,7 @@ function TransactionsPageContent() {
     "all-transactions" | "income" | "investments" | "expenses" | "credit-cards" | "petty-cash"
   >("all-transactions")
   const [transactions, setTransactions] = useState<ApiTransaction[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string>("All")
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
 
   // Use current month instead of hardcoded June
   const currentDate = new Date()
@@ -129,13 +138,18 @@ function TransactionsPageContent() {
   const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [showTransactionForm, setShowTransactionForm] = useState(false)
-  const [selectedCard, setSelectedCard] = useState<string | null>(null)
+  const [selectedCards, setSelectedCards] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState<"date" | "amount">("date")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [totalAmount, setTotalAmount] = useState<number>(0)
+  // Only populated for the All Transactions tab (mixed types) — see
+  // TransactionsListingResponse. null on single-type tabs, where totalAmount
+  // alone is already unambiguous.
+  const [totalIncome, setTotalIncome] = useState<number | null>(null)
+  const [totalOutflow, setTotalOutflow] = useState<number | null>(null)
 
   // Recurring modals
   const [showRecurringManage, setShowRecurringManage] = useState(false)
@@ -145,6 +159,10 @@ function TransactionsPageContent() {
   const [density, setDensity] = useState<Density>("comfortable")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
+
+  // Real credit cards from the API — id is what the backend filters on, and
+  // it must come from here, not be guessed from the name.
+  const [creditCardsList, setCreditCardsList] = useState<{ id: number; card_name: string }[]>([])
 
   // Use ref to prevent duplicate API calls
   const isFetchingRef = useRef(false)
@@ -169,15 +187,50 @@ function TransactionsPageContent() {
     }
   }
 
-  // Get card ID from card name
+  // Look up a card's real id from its name — must come from the API list
+  // (creditCardsList), never a guessed/hardcoded table. A hardcoded name→id
+  // map goes stale the moment a card is renamed or a new one is added, and
+  // silently falling back to some default id means the filter quietly
+  // returns a DIFFERENT card's transactions instead of failing visibly.
   const getCardIdFromName = (cardName: string): string => {
-    const cardMapping: Record<string, string> = {
-      "Amazon ICICI": "1",
-      "Axis MY Zone": "4",
-      "HDFC Regalia": "2",
-      "SBI SimplyCLICK": "3",
+    const match = creditCardsList.find((c) => c.card_name === cardName)
+    return match ? String(match.id) : ""
+  }
+
+  // Fetch the real list of credit cards once — same endpoint/shape the
+  // transaction form uses, so the id is always the backend's actual id.
+  useEffect(() => {
+    const fetchCreditCards = async () => {
+      try {
+        const res = await apiClient(apiUrl("configurations/listing"), {
+          method: "GET",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          mode: "cors",
+        })
+        const data = await res.json()
+        const list = Array.isArray(data?.data?.data) ? (data.data.data as any[]) : []
+        const normalized = list
+          .map((c) => ({ id: Number(c?.id), card_name: String(c?.card_name ?? "") }))
+          .filter((c) => Number.isFinite(c.id) && c.card_name.length > 0)
+        setCreditCardsList(normalized)
+      } catch (e) {
+        console.error("Failed to load credit cards listing:", e)
+        setCreditCardsList([])
+      }
     }
-    return cardMapping[cardName] || "1"
+    fetchCreditCards()
+  }, [])
+
+  // Tabs where a card filter is meaningful — Credit Cards obviously, but also
+  // All Transactions, since narrowing to one card there is a valid way to ask
+  // "show me everything tied to this card" without switching tabs.
+  const cardFilterableTabs = ["credit-cards", "all-transactions"]
+
+  const getActiveCardIds = (): string[] => {
+    if (!cardFilterableTabs.includes(activeTab)) return []
+    return selectedCards
+      .map((name) => getCardIdFromName(name))
+      .filter((id): id is string => id !== "")
   }
 
   // Fetch transactions using the listing API
@@ -185,8 +238,8 @@ function TransactionsPageContent() {
     transactionType: string,
     month: number,
     year: number,
-    category = "",
-    cardId = "",
+    categories: string[] = [],
+    cardIds: string[] = [],
   ) => {
     if (isFetchingRef.current) {
       console.log(`🚫 Already fetching transactions, skipping duplicate call`)
@@ -200,7 +253,7 @@ function TransactionsPageContent() {
       setError(null)
 
       console.log(
-        `🚀 Fetching transactions: type=${transactionType}, month=${month}, year=${year}, category=${category}, cardId=${cardId}`,
+        `🚀 Fetching transactions: type=${transactionType}, month=${month}, year=${year}, categories=${categories}, cardIds=${cardIds}`,
       )
 
       const params = new URLSearchParams({
@@ -216,13 +269,15 @@ function TransactionsPageContent() {
         params.append("transaction_type", transactionType)
       }
 
-      if (category && category !== "All") {
-        params.append("category", category)
-      }
+      // Repeated keys — Express parses these into an array on req.query,
+      // and the backend already turns an array filter into a whereIn().
+      categories.forEach((c) => {
+        if (c && c !== "All") params.append("category", c)
+      })
 
-      if (cardId && cardId !== "all") {
-        params.append("card_id", cardId)
-      }
+      cardIds.forEach((id) => {
+        if (id && id !== "all") params.append("card_id", id)
+      })
 
       const listingUrl = apiUrl("transaction/listing", params)
       console.log(`📡 Transactions API URL: ${listingUrl}`)
@@ -246,12 +301,16 @@ function TransactionsPageContent() {
       if (data.status === "success" && data.data && data.data.status && data.data.data) {
         setTransactions(data.data.data)
         setTotalAmount(data.data.totalAmount || 0)
+        setTotalIncome(data.data.totalIncome ?? null)
+        setTotalOutflow(data.data.totalOutflow ?? null)
         console.log(`✅ Loaded ${data.data.data.length} transactions from API`)
         console.log(`💰 Total Amount: ₹${data.data.totalAmount}`)
       } else {
         console.log("⚠️ API returned success but no transactions data")
         setTransactions([])
         setTotalAmount(0)
+        setTotalIncome(null)
+        setTotalOutflow(null)
       }
     } catch (error) {
       console.error("❌ Error fetching transactions:", error)
@@ -282,18 +341,13 @@ function TransactionsPageContent() {
     const month = selectedMonth.getMonth() + 1
     const year = selectedMonth.getFullYear()
 
-    const cardId =
-      activeTab === "credit-cards" && selectedCard && selectedCard !== "all" ? getCardIdFromName(selectedCard) : ""
+    const cardIds = getActiveCardIds()
 
-    fetchTransactions(transactionType, month, year, selectedCategory, cardId)
-  }, [activeTab, selectedMonth, selectedCategory, selectedCard])
+    fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
+  }, [activeTab, selectedMonth, selectedCategories, selectedCards])
 
   const handleMonthSelect = (month: Date) => {
     setSelectedMonth(month)
-  }
-
-  const handleCategoryFilter = (category: string) => {
-    setSelectedCategory(category)
   }
 
   const handleViewTransaction = (transaction: Transaction) => {
@@ -325,10 +379,9 @@ function TransactionsPageContent() {
       const transactionType = getTransactionTypeForTab(activeTab)
       const month = selectedMonth.getMonth() + 1
       const year = selectedMonth.getFullYear()
-      const cardId =
-        activeTab === "credit-cards" && selectedCard && selectedCard !== "all" ? getCardIdFromName(selectedCard) : ""
+      const cardIds = getActiveCardIds()
 
-      await fetchTransactions(transactionType, month, year, selectedCategory, cardId)
+      await fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
 
       setShowTransactionForm(false)
       setEditingTransaction(null)
@@ -383,10 +436,9 @@ function TransactionsPageContent() {
         const transactionType = getTransactionTypeForTab(activeTab)
         const month = selectedMonth.getMonth() + 1
         const year = selectedMonth.getFullYear()
-        const cardId =
-          activeTab === "credit-cards" && selectedCard && selectedCard !== "all" ? getCardIdFromName(selectedCard) : ""
+        const cardIds = getActiveCardIds()
 
-        await fetchTransactions(transactionType, month, year, selectedCategory, cardId)
+        await fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
         setViewingTransaction(null)
       } else {
         throw new Error("Failed to update payment status")
@@ -437,10 +489,9 @@ function TransactionsPageContent() {
         const transactionType = getTransactionTypeForTab(activeTab)
         const month = selectedMonth.getMonth() + 1
         const year = selectedMonth.getFullYear()
-        const cardId =
-          activeTab === "credit-cards" && selectedCard && selectedCard !== "all" ? getCardIdFromName(selectedCard) : ""
+        const cardIds = getActiveCardIds()
 
-        await fetchTransactions(transactionType, month, year, selectedCategory, cardId)
+        await fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
         setViewingTransaction(null)
       } else {
         throw new Error("Failed to update payment status")
@@ -579,7 +630,7 @@ function TransactionsPageContent() {
         break
     }
 
-    return ["All", ...categories]
+    return categories
   }
 
   // Filter and sort transactions
@@ -604,22 +655,58 @@ function TransactionsPageContent() {
 
   // Whether the empty state should read "no matches" vs "nothing here yet"
   const hasActiveFilters =
-    searchTerm.trim().length > 0 ||
-    (!!selectedCategory && selectedCategory !== "All") ||
-    !!selectedCard
+    searchTerm.trim().length > 0 || selectedCategories.length > 0 || selectedCards.length > 0
 
   const clearAllFilters = () => {
     setSearchTerm("")
-    handleCategoryFilter("All")
-    setSelectedCard(null)
+    setSelectedCategories([])
+    setSelectedCards([])
   }
 
-  // Credit card summary strip — only when a specific card is selected
+  // Totals for the toolbar. The backend computes these with a real SQL SUM
+  // over every row matching the month/type/category/card filters — correct
+  // even when a month has more transactions than the page's row limit, which
+  // a client-side reduce over the loaded page would silently undercount.
+  //
+  // The one thing the backend total can't see is the search box, which is a
+  // client-side substring match with no server round trip. So while a search
+  // term is active, fall back to summing the loaded, search-filtered rows —
+  // scoped to what's on screen, not a database-wide truth — and say so via
+  // `approximate` so the toolbar can hint at it.
+  const hasSearchFilter = searchTerm.trim().length > 0
+
+  const pageLocalTotals = (() => {
+    const inflow = legacyTransactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + t.amount, 0)
+    const outflow = legacyTransactions
+      .filter((t) => t.type !== "income")
+      .reduce((sum, t) => sum + t.amount, 0)
+    return {
+      inflow,
+      outflow,
+      net: inflow - outflow,
+      total: legacyTransactions.reduce((sum, t) => sum + t.amount, 0),
+    }
+  })()
+
+  const listTotals = hasSearchFilter
+    ? pageLocalTotals
+    : {
+        inflow: totalIncome ?? 0,
+        outflow: totalOutflow ?? 0,
+        net: (totalIncome ?? 0) - (totalOutflow ?? 0),
+        total: totalAmount,
+      }
+
+  // Credit card summary strip — only when exactly one card is selected;
+  // with several selected the rows are a mix, so a single "due on" figure
+  // wouldn't mean anything.
   const creditCardSummary = (() => {
-    if (activeTab !== "credit-cards" || !selectedCard) return null
+    if (activeTab !== "credit-cards" || selectedCards.length !== 1) return null
     const total = legacyTransactions.reduce((sum, t) => sum + t.amount, 0)
     const dueDate = legacyTransactions.find((t) => t.dueDate)?.dueDate ?? null
-    return { total, dueDate, cardName: selectedCard }
+    return { total, dueDate, cardName: selectedCards[0] }
   })()
 
   // Get icon for category (legacy — kept for non-table uses)
@@ -643,7 +730,9 @@ function TransactionsPageContent() {
   }
 
   // Get unique credit cards for credit card tab
-  const creditCards = [...new Set(transactions.filter((t) => t.card_name).map((t) => t.card_name))] as string[]
+  // From the real card list, not the loaded page of transactions — a card
+  // with no transactions yet this month should still be filterable.
+  const creditCards = creditCardsList.map((c) => c.card_name)
 
   // Get tab title
   const getTabTitle = () => {
@@ -669,9 +758,8 @@ function TransactionsPageContent() {
     const transactionType = getTransactionTypeForTab(activeTab)
     const month = selectedMonth.getMonth() + 1
     const year  = selectedMonth.getFullYear()
-    const cardId = activeTab === "credit-cards" && selectedCard && selectedCard !== "all"
-      ? getCardIdFromName(selectedCard) : ""
-    fetchTransactions(transactionType, month, year, selectedCategory, cardId)
+    const cardIds = getActiveCardIds()
+    fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
   }
 
   return (
@@ -798,18 +886,21 @@ function TransactionsPageContent() {
               <TransactionsToolbar
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
-                selectedCategory={selectedCategory}
-                onCategoryChange={handleCategoryFilter}
+                selectedCategories={selectedCategories}
+                onCategoriesChange={setSelectedCategories}
                 categories={getAvailableCategories()}
-                showCardFilter={activeTab === "credit-cards"}
-                selectedCard={selectedCard}
-                onCardChange={setSelectedCard}
+                showCardFilter={cardFilterableTabs.includes(activeTab)}
+                selectedCards={selectedCards}
+                onCardsChange={setSelectedCards}
                 cards={creditCards}
                 density={density}
                 onDensityChange={setDensity}
                 resultCount={legacyTransactions.length}
                 totalCount={transactions.length}
                 disabled={loading}
+                totals={listTotals}
+                showBreakdown={activeTab === "all-transactions"}
+                totalsApproximate={hasSearchFilter}
               />
             )}
 
@@ -833,7 +924,7 @@ function TransactionsPageContent() {
                 onToggleSelect={toggleSelect}
                 onToggleSelectAll={toggleSelectAll}
                 showDueDate={activeTab === "expenses"}
-                showCardColumn={activeTab === "credit-cards" && !selectedCard}
+                showCardColumn={activeTab === "credit-cards" && selectedCards.length !== 1}
                 showCardBadge={activeTab === "all-transactions"}
                 onView={handleViewTransaction}
                 onEdit={handleEditTransaction}
