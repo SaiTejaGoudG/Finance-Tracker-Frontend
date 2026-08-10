@@ -8,7 +8,7 @@
 import { Search, X, Rows3, Rows2, ListFilter } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { SearchableSelect } from "@/components/ui/searchable-select"
+import { MultiSelect } from "@/components/ui/multi-select"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
@@ -75,19 +75,23 @@ function DensityToggle({
   )
 }
 
+function fmtINR(n: number) {
+  return `₹${Math.round(Math.abs(n)).toLocaleString("en-IN")}`
+}
+
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
 interface ToolbarProps {
   searchTerm: string
   onSearchChange: (v: string) => void
 
-  selectedCategory: string
-  onCategoryChange: (v: string) => void
+  selectedCategories: string[]
+  onCategoriesChange: (v: string[]) => void
   categories: string[]
 
   showCardFilter?: boolean
-  selectedCard?: string | null
-  onCardChange?: (v: string | null) => void
+  selectedCards?: string[]
+  onCardsChange?: (v: string[]) => void
   cards?: string[]
 
   density: Density
@@ -96,34 +100,53 @@ interface ToolbarProps {
   resultCount: number
   totalCount: number
   disabled?: boolean
+
+  /**
+   * Totals for whatever is currently visible in the table — computed from
+   * the same filtered+sorted list the table renders, so this tracks search,
+   * category and card filters automatically rather than a separate,
+   * possibly-stale server-side figure.
+   */
+  totals?: { inflow: number; outflow: number; net: number; total: number }
+  /** true = mixed types (All Transactions), show inflow/outflow/net; false = show a plain total */
+  showBreakdown?: boolean
+  /**
+   * true while the text search box is filtering — `totals` is then a
+   * client-side sum of the loaded page rather than the backend's exact,
+   * unbounded SUM, so it's labeled as scoped to what's currently shown.
+   */
+  totalsApproximate?: boolean
 }
 
 export default function TransactionsToolbar({
   searchTerm,
   onSearchChange,
-  selectedCategory,
-  onCategoryChange,
+  selectedCategories,
+  onCategoriesChange,
   categories,
   showCardFilter,
-  selectedCard,
-  onCardChange,
+  selectedCards = [],
+  onCardsChange,
   cards = [],
   density,
   onDensityChange,
   resultCount,
   totalCount,
   disabled,
+  totals,
+  showBreakdown,
+  totalsApproximate,
 }: ToolbarProps) {
-  const hasCategoryFilter = selectedCategory && selectedCategory !== "All"
-  const hasCardFilter = Boolean(selectedCard)
+  const hasCategoryFilter = selectedCategories.length > 0
+  const hasCardFilter = selectedCards.length > 0
   const hasSearch = searchTerm.trim().length > 0
   const activeCount =
     (hasCategoryFilter ? 1 : 0) + (hasCardFilter ? 1 : 0) + (hasSearch ? 1 : 0)
 
   const clearAll = () => {
     onSearchChange("")
-    onCategoryChange("All")
-    onCardChange?.(null)
+    onCategoriesChange([])
+    onCardsChange?.([])
   }
 
   return (
@@ -156,9 +179,9 @@ export default function TransactionsToolbar({
 
         <div className="flex items-center gap-2">
           <div className="w-full sm:w-44">
-            <SearchableSelect
-              value={selectedCategory}
-              onValueChange={onCategoryChange}
+            <MultiSelect
+              values={selectedCategories}
+              onValuesChange={onCategoriesChange}
               disabled={disabled}
               placeholder="All categories"
               searchPlaceholder="Search category…"
@@ -168,16 +191,13 @@ export default function TransactionsToolbar({
 
           {showCardFilter && cards.length > 0 && (
             <div className="w-full sm:w-44">
-              <SearchableSelect
-                value={selectedCard || "all"}
-                onValueChange={(v) => onCardChange?.(v === "all" ? null : v)}
+              <MultiSelect
+                values={selectedCards}
+                onValuesChange={(v) => onCardsChange?.(v)}
                 disabled={disabled}
                 placeholder="All cards"
                 searchPlaceholder="Search card…"
-                options={[
-                  { value: "all", label: "All Cards" },
-                  ...cards.map((c) => ({ value: c, label: c })),
-                ]}
+                options={cards.map((c) => ({ value: c, label: c }))}
               />
             </div>
           )}
@@ -199,6 +219,42 @@ export default function TransactionsToolbar({
           {resultCount === 1 ? "transaction" : "transactions"}
         </span>
 
+        {totals && resultCount > 0 && (
+          <>
+            <span className="text-border" aria-hidden="true">
+              |
+            </span>
+            {showBreakdown ? (
+              <span className="inline-flex items-center gap-2 text-xs">
+                {totals.inflow > 0 && (
+                  <span className="tnum text-success-text">+{fmtINR(totals.inflow)}</span>
+                )}
+                {totals.outflow > 0 && (
+                  <span className="tnum text-muted-foreground">−{fmtINR(totals.outflow)}</span>
+                )}
+                <span
+                  className={cn(
+                    "tnum font-semibold",
+                    totals.net >= 0 ? "text-success-text" : "text-foreground",
+                  )}
+                >
+                  Net {totals.net >= 0 ? "+" : "−"}
+                  {fmtINR(totals.net)}
+                </span>
+              </span>
+            ) : (
+              <span className="tnum text-xs font-semibold text-foreground">
+                Total {fmtINR(totals.total)}
+              </span>
+            )}
+            {totalsApproximate && (
+              <span className="text-xs text-muted-foreground" title="Search narrows this to only the rows currently loaded, not a database-wide total">
+                (of loaded results)
+              </span>
+            )}
+          </>
+        )}
+
         {activeCount > 0 && (
           <>
             <span className="text-border" aria-hidden="true">
@@ -212,20 +268,22 @@ export default function TransactionsToolbar({
                 onClear={() => onSearchChange("")}
               />
             )}
-            {hasCategoryFilter && (
+            {selectedCategories.map((c) => (
               <FilterChip
+                key={`cat-${c}`}
                 label="Category"
-                value={selectedCategory}
-                onClear={() => onCategoryChange("All")}
+                value={c}
+                onClear={() => onCategoriesChange(selectedCategories.filter((x) => x !== c))}
               />
-            )}
-            {hasCardFilter && (
+            ))}
+            {selectedCards.map((c) => (
               <FilterChip
+                key={`card-${c}`}
                 label="Card"
-                value={selectedCard!}
-                onClear={() => onCardChange?.(null)}
+                value={c}
+                onClear={() => onCardsChange?.(selectedCards.filter((x) => x !== c))}
               />
-            )}
+            ))}
 
             <Button
               variant="ghost"
