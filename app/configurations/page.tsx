@@ -14,10 +14,11 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, CreditCardIcon, Bell, User } from "lucide-react"
+import { Plus, CreditCardIcon, Bell, User, Tag } from "lucide-react"
 import LayoutWrapper from "@/components/layout-wrapper"
 import { useToast } from "@/components/ui/use-toast"
 import CreditCardsTable from "@/components/credit-cards-table"
+import CategoriesManager from "@/components/categories-manager"
 import { SkeletonRows, EmptyState } from "@/components/ui/states"
 import { cn } from "@/lib/utils"
 
@@ -425,6 +426,7 @@ function ConfigurationsPageContent() {
               ["profile", "Profile"],
               ["notifications", "Notifications"],
               ["credit-cards", "Credit Cards"],
+              ["categories", "Categories"],
             ] as const
           ).map(([value, label]) => (
             <TabsTrigger key={value} value={value} className={TAB_TRIGGER_CLASS}>
@@ -771,6 +773,27 @@ function ConfigurationsPageContent() {
                 Save changes
               </Button>
             </div>
+          </Card>
+        </TabsContent>
+        <TabsContent value="categories" className="mt-4">
+          <Card className="max-w-2xl divide-y overflow-hidden">
+            <div className="px-5 py-4">
+              <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                Categories
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Your own categories, on top of the built-in list. Removing one keeps
+                it on transactions that already use it.
+              </p>
+            </div>
+
+            <SettingsSection
+              title="Custom categories"
+              description="Available in the transaction form for the chosen type."
+            >
+              <CategoriesManager />
+            </SettingsSection>
           </Card>
         </TabsContent>
       </Tabs>

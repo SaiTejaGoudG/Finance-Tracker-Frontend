@@ -39,12 +39,21 @@ const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+  // The page-wide `:focus-visible` ring (globals.css) uses `ring-offset-background`,
+  // which is the *page* background — not this popover's, slightly lighter, surface.
+  // On a combobox that autofocuses the instant it opens, that mismatch reads as a
+  // stray dark box behind a bright ring. There's nothing else on screen competing
+  // for attention here, so swap the ring for a same-surface tint instead of trying
+  // to color-match an offset ring to every possible host background.
+  <div
+    className="flex items-center gap-2 border-b border-border px-3 transition-colors focus-within:bg-accent/50"
+    cmdk-input-wrapper=""
+  >
+    <Search className="h-4 w-4 shrink-0 opacity-50" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        'flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+        'flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none ring-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}
