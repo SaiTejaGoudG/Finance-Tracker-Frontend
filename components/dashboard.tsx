@@ -118,7 +118,6 @@ export type Transaction = {
 // `.find(c => c.name === …)` and `.map(c => c.name)`.
 
 const CATEGORY_ICONS: Record<string, string> = {
-  Airbnb: "home",
   Food: "utensils",
   Transport: "car",
   Utilities: "zap",

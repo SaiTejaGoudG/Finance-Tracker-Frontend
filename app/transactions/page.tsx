@@ -23,6 +23,14 @@ import TransactionForm from "@/components/transaction-form"
 import MonthCalendar from "@/components/month-calendar"
 import LayoutWrapper from "@/components/layout-wrapper"
 import { expenseCategories, incomeCategories, investmentCategories } from "@/components/dashboard"
+import {
+  incomeCategories as incomeCategoryNames,
+  expenseCategories as expenseCategoryNames,
+  investmentCategories as investmentCategoryNames,
+  assetCategories as assetCategoryNames,
+  creditCategories as creditCategoryNames,
+} from "@/lib/data"
+import { useAllCustomCategories } from "@/hooks/use-categories"
 import * as LucideIcons from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import RecurringManageModal from "@/components/recurring-manage-modal"
@@ -163,6 +171,13 @@ function TransactionsPageContent() {
   // month/year navigator below; when both ends are set, it overrides the
   // month for filtering purposes (see fetchTransactions).
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
+
+  // All of the user's own custom categories, across every transaction type,
+  // in one call — used below to union with the built-in lists so the
+  // category filter (and the "All Transactions" view especially) never
+  // hides a category just because it's a custom addition rather than one
+  // of the static defaults.
+  const { custom: customCategories } = useAllCustomCategories()
 
   // Use current month instead of hardcoded June
   const currentDate = new Date()
@@ -654,26 +669,54 @@ function TransactionsPageContent() {
     }
   }
 
-  // Get available categories for the current tab
-  const getAvailableCategories = (): string[] => {
-    let categories: string[] = []
+  // Case-insensitive dedupe, alphabetical — same convention used for the
+  // category suggestion lists elsewhere (Configurations, Business ledgers).
+  const dedupeCategoryNames = (names: string[]): string[] => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const n of names) {
+      const key = n.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(n)
+    }
+    return out.sort((a, b) => a.localeCompare(b))
+  }
 
+  const customNamesFor = (type: string) =>
+    customCategories.filter((c) => c.transaction_type === type).map((c) => c.name)
+
+  // Get available categories for the current tab — every built-in for that
+  // type PLUS the user's own custom categories of that type. Previously this
+  // fell back to a single hardcoded Expense-only list for expenses, credit
+  // cards, petty cash AND "all transactions", which both hid Credit
+  // Card/Asset-specific categories entirely and never included any custom
+  // category (e.g. a user-added "Airbnb") no matter which tab was open.
+  const getAvailableCategories = (): string[] => {
     switch (activeTab) {
       case "income":
-        categories = incomeCategories.map((cat) => cat.name)
-        break
+        return dedupeCategoryNames([...incomeCategoryNames, ...customNamesFor("Income")])
       case "investments":
-        categories = investmentCategories.map((cat) => cat.name)
-        break
+        return dedupeCategoryNames([...investmentCategoryNames, ...customNamesFor("Investment")])
       case "expenses":
+        return dedupeCategoryNames([...expenseCategoryNames, ...customNamesFor("Expense")])
       case "credit-cards":
+        return dedupeCategoryNames([...creditCategoryNames, ...customNamesFor("Credit Card")])
       case "petty-cash":
+        return dedupeCategoryNames([...expenseCategoryNames, ...customNamesFor("Petty Cash")])
       case "all-transactions":
-        categories = expenseCategories.map((cat) => cat.name)
-        break
+      default:
+        // Every transaction type can show up in this tab, so every
+        // category — built-in or custom, from any type — is a valid filter.
+        return dedupeCategoryNames([
+          ...incomeCategoryNames,
+          ...expenseCategoryNames,
+          ...investmentCategoryNames,
+          ...assetCategoryNames,
+          ...creditCategoryNames,
+          ...customCategories.map((c) => c.name),
+        ])
     }
-
-    return categories
   }
 
   // Filter and sort transactions
@@ -808,6 +851,22 @@ function TransactionsPageContent() {
     }
   }
 
+  // A custom "from – to" date range only actually filters the
+  // all-transactions tab (see fetchTransactions/getAvailableCategories'
+  // sibling logic) — everywhere else still navigates by month regardless of
+  // whether a range happens to be set. The header used to always show the
+  // month name even when a range WAS active and driving the results, which
+  // read as wrong/stale. Show the real range when it's the thing actually
+  // filtering; fall back to the month otherwise.
+  const getPeriodLabel = () => {
+    if (activeTab === "all-transactions" && dateRange?.from && dateRange?.to) {
+      const sameYear = dateRange.from.getFullYear() === dateRange.to.getFullYear()
+      const fromFmt = sameYear ? "d MMM" : "d MMM yyyy"
+      return `${format(dateRange.from, fromFmt)} – ${format(dateRange.to, "d MMM yyyy")}`
+    }
+    return format(selectedMonth, "MMMM yyyy")
+  }
+
   const refreshTransactions = () => {
     const transactionType = getTransactionTypeForTab(activeTab)
     const month = selectedMonth.getMonth() + 1
@@ -894,7 +953,7 @@ function TransactionsPageContent() {
                   {getTabTitle()}
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {format(selectedMonth, "MMMM yyyy")}
+                  {getPeriodLabel()}
                   {creditCardSummary && (
                     <>
                       {" · "}

@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import StatusBadge from "@/components/status-badge"
 import TransactionActions from "@/components/transaction-actions"
 import { getCategoryMeta, getTypeColor, type TxType } from "@/lib/tx-meta"
+import { getCardColor } from "@/lib/card-meta"
 import { groupByDate } from "@/lib/group-transactions"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/app/transactions/page"
@@ -335,6 +336,7 @@ export default function TransactionsTable({
               const { emoji, color } = getCategoryMeta(t.category)
               const type = getTypeColor(t.type)
               const effectiveType = getTypeColor(getEffectiveTypeKey(t))
+              const cardColor = getCardColor(t.cardName)
               const synthetic = isSynthetic(t.id)
               const selected = selectedIds.has(t.id)
 
@@ -384,7 +386,10 @@ export default function TransactionsTable({
                           >
                             {effectiveType.label}
                           </span>
-                          <span className="truncate text-xs text-muted-foreground">
+                          <span
+                            className="inline-flex shrink-0 items-center truncate rounded-full px-1.5 py-0.5 text-xs font-medium"
+                            style={{ backgroundColor: `${color}26`, color }}
+                          >
                             {t.category}
                           </span>
                           {t.splitOwnShare != null && (
@@ -414,8 +419,13 @@ export default function TransactionsTable({
                             <span
                               className={cn(
                                 "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-xs",
-                                type.badgeClass,
+                                !cardColor && type.badgeClass,
                               )}
+                              style={
+                                cardColor
+                                  ? { backgroundColor: `${cardColor}26`, color: cardColor }
+                                  : undefined
+                              }
                             >
                               {t.cardName}
                             </span>
@@ -469,7 +479,17 @@ export default function TransactionsTable({
                   {showCardColumn && (
                     <td className={cn("px-2", rowPad)}>
                       {t.cardName ? (
-                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs",
+                            !cardColor && "bg-muted text-muted-foreground",
+                          )}
+                          style={
+                            cardColor
+                              ? { backgroundColor: `${cardColor}26`, color: cardColor }
+                              : undefined
+                          }
+                        >
                           {t.cardName}
                         </span>
                       ) : (

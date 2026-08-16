@@ -22,6 +22,7 @@ type CreditCard = {
   billingCycleDate: number
   paymentDueDays: number
   createdAt: string
+  color?: string | null
 }
 
 type CreditCardsTableProps = {
@@ -70,7 +71,16 @@ export default function CreditCardsTable({ creditCards, onEdit, onDelete }: Cred
 
             return (
               <TableRow key={card.id}>
-                <TableCell className="font-medium">{card.cardName}</TableCell>
+                <TableCell className="font-medium">
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full border"
+                      style={{ backgroundColor: card.color || "transparent" }}
+                      aria-hidden="true"
+                    />
+                    {card.cardName}
+                  </span>
+                </TableCell>
                 <TableCell className="font-mono text-sm">{`****${last4Digits}`}</TableCell>
                 <TableCell className="font-medium tnum">{formatCurrency(card.cardLimit)}</TableCell>
                 <TableCell className="tnum">{card.billingCycleDate}th</TableCell>

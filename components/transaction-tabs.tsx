@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/states"
 import TransactionActions from "@/components/transaction-actions"
 import { ArrowDownIcon, ArrowUpIcon, Search, ReceiptText } from "lucide-react"
 import { getCategoryMeta, getTypeColor } from "@/lib/tx-meta"
+import { getCardColor } from "@/lib/card-meta"
 import { cn } from "@/lib/utils"
 
 import type { Transaction as DashboardTransaction } from "@/components/dashboard"
@@ -313,6 +314,7 @@ export default function TransactionTabs(props: Props) {
                   {sorted.map((transaction) => {
                     const { emoji, color } = getCategoryMeta(transaction.category)
                     const colors = getTypeColor(transaction.type)
+                    const cardColor = getCardColor(transaction.cardName)
                     return (
                       <TableRow key={transaction.id} className="hover:bg-muted/40 transition-colors">
                         {/* Description + emoji icon */}
@@ -330,7 +332,17 @@ export default function TransactionTabs(props: Props) {
                                 <p className="text-xs text-muted-foreground truncate">{transaction.category}</p>
                                 {/* Card name badge — shown in All Transactions for credit-type rows */}
                                 {activeTab === "all-transactions" && transaction.type === "credit" && transaction.cardName && (
-                                  <span className="inline-flex items-center gap-0.5 text-xs text-info-text bg-info-subtle border border-info/25 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full flex-shrink-0",
+                                      !cardColor && "text-info-text bg-info-subtle border border-info/25",
+                                    )}
+                                    style={
+                                      cardColor
+                                        ? { backgroundColor: `${cardColor}26`, color: cardColor }
+                                        : undefined
+                                    }
+                                  >
                                     💳 {transaction.cardName}
                                   </span>
                                 )}
@@ -366,9 +378,23 @@ export default function TransactionTabs(props: Props) {
                         {/* Card column — only when All Cards is selected */}
                         {activeTab === "credit-cards" && !selectedCard && (
                           <TableCell>
-                            {transaction.cardName
-                              ? <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{transaction.cardName}</span>
-                              : <span className="text-muted-foreground">—</span>}
+                            {transaction.cardName ? (
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
+                                  !cardColor && "text-muted-foreground bg-muted",
+                                )}
+                                style={
+                                  cardColor
+                                    ? { backgroundColor: `${cardColor}26`, color: cardColor }
+                                    : undefined
+                                }
+                              >
+                                {transaction.cardName}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                         )}
 

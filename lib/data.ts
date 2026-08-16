@@ -21,11 +21,10 @@ export const creditCards = ["Amazon ICICI", "Axis MY Zone", "HDFC Regalia", "SBI
 // hooks/use-categories.ts, which merges both.
 
 // Income categories
-export const incomeCategories = ["Airbnb", "Salary", "Interest", "Freelancing", "Others"]
+export const incomeCategories = ["Salary", "Interest", "Freelancing", "Others"]
 
 // Expense categories
 export const expenseCategories = [
-  "Airbnb",
   "Bike Fuel",
   "Bike Service",
   "Car Accessories",
@@ -62,7 +61,6 @@ export const expenseCategories = [
 
 // Credit categories (for credit card transactions)
 export const creditCategories = [
-  "Airbnb",
   "Food & Dining",
   "Transportation",
   "Shopping",
@@ -79,11 +77,10 @@ export const creditCategories = [
 ]
 
 // Investment categories
-export const investmentCategories = ["Airbnb", "Chitti", "SIP"]
+export const investmentCategories = ["Chitti", "SIP"]
 
 // Asset categories (physical assets — land, gold, property, vehicles)
 export const assetCategories = [
-  "Airbnb",
   "Equipment",
   "Land",
   "Other Asset",

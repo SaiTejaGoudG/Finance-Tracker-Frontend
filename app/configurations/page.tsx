@@ -20,6 +20,9 @@ import { useToast } from "@/components/ui/use-toast"
 import CreditCardsTable from "@/components/credit-cards-table"
 import CategoriesManager from "@/components/categories-manager"
 import { SkeletonRows, EmptyState } from "@/components/ui/states"
+import { ColorPickerButton } from "@/components/ui/color-picker-button"
+import { CATEGORY_COLOR_CHOICES } from "@/lib/tx-meta"
+import { registerCardColor } from "@/lib/card-meta"
 import { cn } from "@/lib/utils"
 
 /**
@@ -89,6 +92,9 @@ interface CreditCardType {
   billing_cycle_date: number
   due_days: number
   created_at?: string
+  /** User-chosen label badge color (hex), if they set one. Falls back to
+   *  the existing neutral badge styling when null/absent. */
+  color?: string | null
 }
 
 interface TransformedCreditCard {
@@ -99,6 +105,7 @@ interface TransformedCreditCard {
   billingCycleDate: number
   paymentDueDays: number
   createdAt: string
+  color?: string | null
 }
 
 interface NotificationSettings {
@@ -134,6 +141,7 @@ function ConfigurationsPageContent() {
     card_limit: "",
     billing_cycle_date: "",
     due_days: "",
+    color: "",
   })
 
   const [notifications, setNotifications] = useState<NotificationSettings>({
@@ -196,6 +204,7 @@ function ConfigurationsPageContent() {
           billingCycleDate: card.billing_cycle_date,
           paymentDueDays: card.due_days,
           createdAt: card.created_at || new Date().toISOString(),
+          color: card.color,
         }))
         setCreditCards(transformedCards)
       }
@@ -219,6 +228,7 @@ function ConfigurationsPageContent() {
         card_limit: Number.parseInt(newCard.card_limit),
         billing_cycle_date: Number.parseInt(newCard.billing_cycle_date),
         due_days: Number.parseInt(newCard.due_days),
+        color: newCard.color || undefined,
         user_id: user?.id,
       }
 
@@ -231,12 +241,17 @@ function ConfigurationsPageContent() {
       const result = await response.json()
 
       if (result.status) {
+        // Reflect the color app-wide for the rest of this session
+        // immediately, without waiting for the next useCardColorSync fetch.
+        registerCardColor(newCard.card_name, newCard.color)
+
         setNewCard({
           card_name: "",
           card_number: "",
           card_limit: "",
           billing_cycle_date: "",
           due_days: "",
+          color: "",
         })
         setShowAddCard(false)
 
@@ -269,6 +284,7 @@ function ConfigurationsPageContent() {
       billing_cycle_date: card.billingCycleDate,
       due_days:           card.paymentDueDays,
       created_at:         card.createdAt,
+      color:              card.color,
     }
     setEditingCard(raw)
     setNewCard({
@@ -277,6 +293,7 @@ function ConfigurationsPageContent() {
       card_limit:         raw.card_limit          ? raw.card_limit.toString()         : "",
       billing_cycle_date: raw.billing_cycle_date  ? raw.billing_cycle_date.toString() : "",
       due_days:           raw.due_days            ? raw.due_days.toString()           : "",
+      color:              raw.color               || "",
     })
     setShowAddCard(true)
   }
@@ -292,6 +309,10 @@ function ConfigurationsPageContent() {
         card_limit: Number.parseInt(newCard.card_limit),
         billing_cycle_date: Number.parseInt(newCard.billing_cycle_date),
         due_days: Number.parseInt(newCard.due_days),
+        // Sent even when empty — an empty string here means "clear my
+        // custom color", not "leave it unchanged" (see
+        // configurationsController.js's sanitizeColorForUpdate).
+        color: newCard.color,
         user_id: user?.id,
       }
 
@@ -304,6 +325,8 @@ function ConfigurationsPageContent() {
       const result = await response.json()
 
       if (result.status) {
+        registerCardColor(newCard.card_name, newCard.color)
+
         setEditingCard(null)
         setNewCard({
           card_name: "",
@@ -311,6 +334,7 @@ function ConfigurationsPageContent() {
           card_limit: "",
           billing_cycle_date: "",
           due_days: "",
+          color: "",
         })
         setShowAddCard(false)
 
@@ -464,6 +488,7 @@ function ConfigurationsPageContent() {
                         card_limit: "",
                         billing_cycle_date: "",
                         due_days: "",
+                        color: "",
                       })
                     }
                     setShowAddCard(open)
@@ -480,15 +505,31 @@ function ConfigurationsPageContent() {
                       <DialogTitle>{editingCard ? "Edit Credit Card" : "Add Credit Card"}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="cardName">Card Name</Label>
-                        <Input
-                          id="cardName"
-                          value={newCard.card_name}
-                          onChange={(e) => setNewCard({ ...newCard, card_name: e.target.value })}
-                          placeholder="e.g., Amazon ICICI, Axis MY Zone"
-                        />
+                      <div className="flex items-end gap-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium">Label color</Label>
+                          <ColorPickerButton
+                            value={newCard.color}
+                            onChange={(color) => setNewCard({ ...newCard, color })}
+                            choices={CATEGORY_COLOR_CHOICES}
+                            fallbackColor="#6b7280"
+                            label="Pick a label color"
+                          />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <Label htmlFor="cardName">Card Name</Label>
+                          <Input
+                            id="cardName"
+                            value={newCard.card_name}
+                            onChange={(e) => setNewCard({ ...newCard, card_name: e.target.value })}
+                            placeholder="e.g., Amazon ICICI, Axis MY Zone"
+                          />
+                        </div>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        Sets the background color for this card's name badge next to
+                        transactions — optional, leave it as-is for the default neutral look.
+                      </p>
                       <div className="space-y-2">
                         <Label htmlFor="cardNumber">Card Number (Last 4 digits)</Label>
                         <Input
@@ -548,6 +589,7 @@ function ConfigurationsPageContent() {
                               card_limit: "",
                               billing_cycle_date: "",
                               due_days: "",
+                              color: "",
                             })
                           }}
                         >

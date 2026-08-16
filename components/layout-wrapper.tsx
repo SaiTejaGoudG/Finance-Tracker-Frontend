@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Menu, LogOut, User } from "lucide-react"
 import { ThemeToggle } from "./theme-toggle"
 import { useAuth } from "@/context/AuthContext"
+import { useCategorySync } from "@/hooks/use-categories"
+import { useCardColorSync } from "@/hooks/use-credit-cards"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +26,19 @@ interface LayoutWrapperProps {
 
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, logout } = useAuth()
+  const { user, logout, isAuthenticated } = useAuth()
+
+  // Registers any custom category emoji (set in Configurations -> Categories)
+  // into lib/tx-meta.ts's override cache once per authenticated session, so
+  // getCategoryMeta(name) picks them up everywhere it's already called — the
+  // transaction list, dashboard charts, category pickers — with no changes
+  // needed at those call sites. This wrapper is the one thing every
+  // authenticated page renders (AppShell pages and the standalone
+  // Configurations page both use it), so it's the right single place for a
+  // once-per-session fetch rather than repeating it per-page.
+  useCategorySync(isAuthenticated)
+  // Same rationale as useCategorySync above, for credit_cards.color instead.
+  useCardColorSync(isAuthenticated)
 
   const initials = user?.name
     ? user.name

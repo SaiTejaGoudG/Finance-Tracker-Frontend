@@ -35,6 +35,7 @@ import {
   Building2,
   Sparkles,
   HandCoins,
+  Briefcase,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 
@@ -67,6 +68,7 @@ const NAV: NavGroup[] = [
       { title: "Loans", href: "/loans", icon: Landmark },
       { title: "Assets", href: "/assets", icon: Building2 },
       { title: "Borrowings & Lending", href: "/lending", icon: HandCoins },
+      { title: "Business", href: "/business", icon: Briefcase },
     ],
   },
   {

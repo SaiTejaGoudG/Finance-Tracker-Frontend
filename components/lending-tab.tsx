@@ -27,6 +27,7 @@ import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
 import { EmptyState } from "@/components/ui/states"
 import { toast } from "@/hooks/use-toast"
+import TransactionForm from "@/components/transaction-form"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -595,6 +596,7 @@ export default function LendingTab() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | Direction>("all")
   const [personFilter, setPersonFilter] = useState<string | null>(null)
+  const [txnFormOpen, setTxnFormOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -644,7 +646,13 @@ export default function LendingTab() {
             Money you've given to or received from people — tracked separately from income/expense
           </p>
         </div>
-        <AddLoanDialog onSaved={refresh} />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setTxnFormOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add transaction
+          </Button>
+          <AddLoanDialog onSaved={refresh} />
+        </div>
       </div>
 
       {/* KPI tiles */}
@@ -792,6 +800,25 @@ export default function LendingTab() {
           does show up in those totals.
         </p>
       </div>
+
+      {/* TransactionForm does its own create API call — this just closes the
+          dialog and refreshes loans/summary in case the new transaction is
+          a repayment or interest entry that affects them. */}
+      <Dialog open={txnFormOpen} onOpenChange={setTxnFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add transaction</DialogTitle>
+          </DialogHeader>
+          <TransactionForm
+            onSubmit={async () => {
+              setTxnFormOpen(false)
+              toast({ title: "Transaction added" })
+              refresh()
+            }}
+            onCancel={() => setTxnFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

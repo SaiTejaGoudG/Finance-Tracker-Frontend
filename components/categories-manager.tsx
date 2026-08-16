@@ -9,19 +9,217 @@
  * historical label survives. It simply stops being offered in new dropdowns.
  */
 
-import { useState } from "react"
-import { Plus, Trash2, Tag, Loader2, Check } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Plus, Trash2, Pencil, Tag, Loader2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ColorPickerButton } from "@/components/ui/color-picker-button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { EmptyState, SkeletonRows, ErrorBanner } from "@/components/ui/states"
-import { getCategoryMeta } from "@/lib/tx-meta"
+import { getCategoryMeta, CATEGORY_EMOJI_CHOICES, CATEGORY_COLOR_CHOICES } from "@/lib/tx-meta"
 import { cn } from "@/lib/utils"
 import {
   useAllCustomCategories,
   type CategoryType,
+  type UserCategory,
 } from "@/hooks/use-categories"
+
+// ─── Emoji picker (shared by the add form and the edit dialog) ────────────────
+
+function EmojiPickerButton({
+  value,
+  onChange,
+  disabled,
+  fallbackFor,
+}: {
+  value: string
+  onChange: (emoji: string) => void
+  disabled?: boolean
+  fallbackFor: string
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-md border bg-card text-2xl leading-none transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={value ? `Emoji: ${value}. Click to change.` : "Choose an emoji"}
+        >
+          {value || getCategoryMeta(fallbackFor).emoji}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-3">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <p className="text-xs font-medium text-muted-foreground">Pick an emoji</p>
+          {value && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange("")
+                setOpen(false)
+              }}
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Use default
+            </button>
+          )}
+        </div>
+        <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto">
+          {CATEGORY_EMOJI_CHOICES.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => {
+                onChange(e)
+                setOpen(false)
+              }}
+              aria-label={`Choose ${e}`}
+              className={cn(
+                "grid h-10 w-10 shrink-0 place-items-center rounded-md text-2xl leading-none transition-colors hover:bg-accent",
+                value === e && "bg-primary/15 ring-1 ring-primary",
+              )}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+// ─── Edit dialog ────────────────────────────────────────────────────────────
+
+function EditCategoryDialog({
+  category,
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  category: UserCategory | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSave: (
+    id: number,
+    changes: { name?: string; emoji?: string | null; color?: string | null },
+  ) => Promise<UserCategory>
+}) {
+  const { toast } = useToast()
+  const [name, setName] = useState("")
+  const [emoji, setEmoji] = useState("")
+  const [color, setColor] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (category) {
+      setName(category.name)
+      setEmoji(category.emoji || "")
+      setColor(category.color || "")
+    }
+  }, [category])
+
+  const handleSave = async () => {
+    if (!category) return
+    const trimmed = name.trim()
+    if (!trimmed) return
+
+    setSaving(true)
+    try {
+      await onSave(category.id, { name: trimmed, emoji, color })
+      toast({ title: "Category updated", description: `"${trimmed}" has been saved.` })
+      onOpenChange(false)
+    } catch (e) {
+      toast({
+        title: "Couldn't update category",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit category</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="flex items-end gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Emoji</Label>
+              <EmojiPickerButton
+                value={emoji}
+                onChange={setEmoji}
+                disabled={saving}
+                fallbackFor={name || category?.name || ""}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Color</Label>
+              <ColorPickerButton
+                value={color}
+                onChange={setColor}
+                disabled={saving}
+                choices={CATEGORY_COLOR_CHOICES}
+                fallbackColor={getCategoryMeta(name || category?.name || "").color}
+                label="Pick an icon color"
+              />
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <Label htmlFor="edit-category-name" className="text-xs font-medium">
+                Category name
+              </Label>
+              <Input
+                id="edit-category-name"
+                value={name}
+                maxLength={100}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    handleSave()
+                  }
+                }}
+                disabled={saving}
+              />
+            </div>
+          </div>
+
+          {category && (
+            <p className="text-xs text-muted-foreground">
+              This only edits the {category.transaction_type} row for "{category.name}". If the
+              same name is also offered under another transaction type, edit that one separately.
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !name.trim()}>
+            {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 const TYPES: CategoryType[] = [
   "Income",
@@ -34,12 +232,16 @@ const TYPES: CategoryType[] = [
 
 export default function CategoriesManager() {
   const { toast } = useToast()
-  const { custom, loading, error, refetch, create, remove } = useAllCustomCategories()
+  const { custom, loading, error, refetch, create, update, remove } = useAllCustomCategories()
 
   const [name, setName] = useState("")
+  const [emoji, setEmoji] = useState("")
+  const [color, setColor] = useState("")
   const [types, setTypes] = useState<CategoryType[]>([])
   const [saving, setSaving] = useState(false)
   const [removingId, setRemovingId] = useState<number | null>(null)
+  const [editingCategory, setEditingCategory] = useState<UserCategory | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
 
   const toggleType = (t: CategoryType) => {
     setTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
@@ -51,7 +253,7 @@ export default function CategoriesManager() {
 
     setSaving(true)
     try {
-      const { createdTypes, existingTypes } = await create(trimmed, types)
+      const { createdTypes, existingTypes } = await create(trimmed, types, emoji, color)
 
       if (createdTypes.length === 0) {
         toast({
@@ -70,6 +272,8 @@ export default function CategoriesManager() {
             : `"${trimmed}" is now available for ${createdTypes.join(", ")}.`,
       })
       setName("")
+      setEmoji("")
+      setColor("")
       setTypes([])
     } catch (e) {
       toast({
@@ -111,6 +315,28 @@ export default function CategoriesManager() {
       {/* Add form */}
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Emoji</Label>
+            <EmojiPickerButton
+              value={emoji}
+              onChange={setEmoji}
+              disabled={saving}
+              fallbackFor={name.trim()}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Color</Label>
+            <ColorPickerButton
+              value={color}
+              onChange={setColor}
+              disabled={saving}
+              choices={CATEGORY_COLOR_CHOICES}
+              fallbackColor={getCategoryMeta(name.trim()).color}
+              label="Pick an icon color"
+            />
+          </div>
+
           <div className="flex-1 space-y-1.5">
             <Label htmlFor="new-category" className="text-xs font-medium">
               Category name
@@ -140,6 +366,10 @@ export default function CategoriesManager() {
             Add
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Click the icons to pick an emoji and icon color — both optional, leave them as-is to use
+          the defaults shown.
+        </p>
 
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">
@@ -193,7 +423,9 @@ export default function CategoriesManager() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {items.map((c) => {
-                  const { emoji, color } = getCategoryMeta(c.name)
+                  const meta = getCategoryMeta(c.name)
+                  const emoji = c.emoji || meta.emoji
+                  const color = c.color || meta.color
                   const busy = removingId === c.id
                   return (
                     <span
@@ -208,6 +440,16 @@ export default function CategoriesManager() {
                         {emoji}
                       </span>
                       <span className="text-foreground">{c.name}</span>
+                      <button
+                        onClick={() => {
+                          setEditingCategory(c)
+                          setEditDialogOpen(true)
+                        }}
+                        aria-label={`Edit ${c.name}`}
+                        className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         onClick={() => handleRemove(c.id, c.name)}
                         disabled={busy}
@@ -228,6 +470,13 @@ export default function CategoriesManager() {
           ))}
         </div>
       )}
+
+      <EditCategoryDialog
+        category={editingCategory}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSave={update}
+      />
     </div>
   )
 }
