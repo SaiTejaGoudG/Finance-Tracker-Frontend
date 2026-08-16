@@ -5,14 +5,106 @@
  * density toggle, and the row-selection action bar.
  */
 
-import { Search, X, Rows3, Rows2, ListFilter } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Search, X, Rows3, Rows2, ListFilter, CalendarRange } from "lucide-react"
+import { format } from "date-fns"
+import type { DateRange } from "react-day-picker"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { MultiSelect } from "@/components/ui/multi-select"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 export type Density = "comfortable" | "compact"
+
+// ─── Date range filter ────────────────────────────────────────────────────────
+// Additive to the month/year navigator elsewhere on the page — when set, this
+// exact span of days is what's actually sent to the backend instead of the
+// whole selected month.
+
+function DateRangeFilter({
+  range,
+  onRangeChange,
+  disabled,
+}: {
+  range?: DateRange
+  onRangeChange: (r: DateRange | undefined) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<DateRange | undefined>(range)
+
+  // Re-sync the in-popover draft whenever the applied range changes
+  // elsewhere (e.g. cleared via the filter chip).
+  useEffect(() => {
+    if (!open) setDraft(range)
+  }, [range, open])
+
+  const label =
+    range?.from && range?.to
+      ? `${format(range.from, "d MMM")} – ${format(range.to, "d MMM")}`
+      : range?.from
+        ? `${format(range.from, "d MMM")} – …`
+        : "All dates"
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (o) setDraft(range)
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          disabled={disabled}
+          className={cn(
+            "h-9 w-full justify-start gap-2 text-left font-normal sm:w-48",
+            !range?.from && "text-muted-foreground",
+          )}
+        >
+          <CalendarRange className="h-4 w-4 shrink-0" />
+          <span className="truncate">{label}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="range"
+          selected={draft}
+          onSelect={setDraft}
+          numberOfMonths={2}
+          defaultMonth={draft?.from}
+        />
+        <div className="flex items-center justify-between gap-2 border-t p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setDraft(undefined)
+              onRangeChange(undefined)
+              setOpen(false)
+            }}
+          >
+            Clear
+          </Button>
+          <Button
+            size="sm"
+            disabled={!draft?.from || !draft?.to}
+            onClick={() => {
+              onRangeChange(draft)
+              setOpen(false)
+            }}
+          >
+            Apply
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 // ─── Active filter chip ───────────────────────────────────────────────────────
 
@@ -94,6 +186,10 @@ interface ToolbarProps {
   onCardsChange?: (v: string[]) => void
   cards?: string[]
 
+  showDateFilter?: boolean
+  dateRange?: DateRange
+  onDateRangeChange?: (r: DateRange | undefined) => void
+
   density: Density
   onDensityChange: (d: Density) => void
 
@@ -128,6 +224,9 @@ export default function TransactionsToolbar({
   selectedCards = [],
   onCardsChange,
   cards = [],
+  showDateFilter,
+  dateRange,
+  onDateRangeChange,
   density,
   onDensityChange,
   resultCount,
@@ -140,13 +239,15 @@ export default function TransactionsToolbar({
   const hasCategoryFilter = selectedCategories.length > 0
   const hasCardFilter = selectedCards.length > 0
   const hasSearch = searchTerm.trim().length > 0
+  const hasDateFilter = Boolean(dateRange?.from && dateRange?.to)
   const activeCount =
-    (hasCategoryFilter ? 1 : 0) + (hasCardFilter ? 1 : 0) + (hasSearch ? 1 : 0)
+    (hasCategoryFilter ? 1 : 0) + (hasCardFilter ? 1 : 0) + (hasSearch ? 1 : 0) + (hasDateFilter ? 1 : 0)
 
   const clearAll = () => {
     onSearchChange("")
     onCategoriesChange([])
     onCardsChange?.([])
+    onDateRangeChange?.(undefined)
   }
 
   return (
@@ -200,6 +301,14 @@ export default function TransactionsToolbar({
                 options={cards.map((c) => ({ value: c, label: c }))}
               />
             </div>
+          )}
+
+          {showDateFilter && (
+            <DateRangeFilter
+              range={dateRange}
+              onRangeChange={(r) => onDateRangeChange?.(r)}
+              disabled={disabled}
+            />
           )}
 
           <DensityToggle density={density} onChange={onDensityChange} />
@@ -284,6 +393,13 @@ export default function TransactionsToolbar({
                 onClear={() => onCardsChange?.(selectedCards.filter((x) => x !== c))}
               />
             ))}
+            {hasDateFilter && dateRange?.from && dateRange?.to && (
+              <FilterChip
+                label="Date"
+                value={`${format(dateRange.from, "d MMM")} – ${format(dateRange.to, "d MMM")}`}
+                onClear={() => onDateRangeChange?.(undefined)}
+              />
+            )}
 
             <Button
               variant="ghost"

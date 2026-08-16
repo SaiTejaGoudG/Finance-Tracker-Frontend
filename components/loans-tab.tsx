@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   ArrowLeft, Landmark, CalendarClock, IndianRupee, Clock, TrendingDown,
-  Calculator, Info, AlertTriangle, CheckCircle2, ChevronRight, Wallet, Plus,
+  Calculator, Info, AlertTriangle, CheckCircle2, ChevronRight, Wallet, Plus, Loader2,
 } from "lucide-react"
 import { format, addMonths, parseISO } from "date-fns"
 import { apiClient } from "@/lib/apiClient"
@@ -716,6 +716,39 @@ function LoanDetail({
     setImpact(calcPrepaymentImpact(outstanding, loan.apr, remainingMonths, loan.standardEmi, amt, prepayMode))
   }
 
+  // ── Preclosure — backend (POST /loans/:id/preclosure) already existed and
+  // charges exactly outstanding_principal; this tab previously showed a
+  // static card claiming foreclosure charges + GST were calculated (they
+  // aren't) and a gating condition ("needs an EMI payment on record") that
+  // doesn't exist in the backend at all — both simply false. Replaced with
+  // an actual action wired to the real endpoint. ──────────────────────────
+  const [precloseOpen, setPrecloseOpen] = useState(false)
+  const [preclosing, setPreclosing] = useState(false)
+  const [precloseError, setPrecloseError] = useState<string | null>(null)
+
+  const handlePreclose = async () => {
+    setPreclosing(true)
+    setPrecloseError(null)
+    try {
+      const res = await apiClient(apiUrl(`/loans/${loan.id}/preclosure`), {
+        method: "POST",
+        body: JSON.stringify({ payment_date: new Date().toISOString().split("T")[0] }),
+      })
+      if (res.ok) {
+        setPrecloseOpen(false)
+        onRefresh()
+        onBack()
+      } else {
+        const j = await res.json().catch(() => ({}))
+        setPrecloseError(j.message || "Failed to preclose the loan. Please try again.")
+      }
+    } catch {
+      setPrecloseError("Failed to preclose the loan. Please try again.")
+    } finally {
+      setPreclosing(false)
+    }
+  }
+
   const tabCls = "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
 
   return (
@@ -1144,22 +1177,61 @@ function LoanDetail({
             </Card>
           </div>
 
-          {/* Preclosure info */}
+          {/* Preclosure */}
           <Card className="shadow-sm border-warning/25 bg-warning-subtle">
             <CardContent className="p-4 flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-warning-subtle-foreground shrink-0 mt-0.5" />
-              <div className="text-sm">
+              <div className="text-sm flex-1">
                 <p className="font-semibold text-warning-subtle-foreground">Preclosure / Full Settlement</p>
                 <p className="text-warning-subtle-foreground mt-1">
-                  Full preclosure calculates your outstanding principal + foreclosure charges + applicable GST.
-                  This feature will be enabled once the loan has at least one EMI payment on record.
-                  Current outstanding for settlement: <span className="font-bold tnum">{fmtINR(outstanding)}</span>
+                  Preclosing pays off your remaining principal in one shot and closes the loan. This charges
+                  exactly your outstanding principal — foreclosure charges and GST aren&apos;t calculated here,
+                  so check your lender's statement if they add those separately.
                 </p>
+                <p className="text-warning-subtle-foreground mt-2">
+                  Amount to settle: <span className="font-bold tnum">{fmtINR(outstanding)}</span>
+                </p>
+                {loan.status === "Active" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 border-warning/40 bg-transparent hover:bg-warning/10"
+                    onClick={() => setPrecloseOpen(true)}
+                  >
+                    Preclose Loan
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Preclosure confirmation */}
+      <Dialog open={precloseOpen} onOpenChange={(o) => { if (!preclosing) { setPrecloseOpen(o); if (!o) setPrecloseError(null) } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Preclose this loan?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              This records a one-time payment of{" "}
+              <span className="font-semibold text-foreground tnum">{fmtINR(outstanding)}</span> as an Expense,
+              marks every remaining EMI as paid, and closes the loan. This can&apos;t be undone from here.
+            </p>
+            {precloseError && <p className="text-destructive-text">{precloseError}</p>}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setPrecloseOpen(false)} disabled={preclosing}>
+              Cancel
+            </Button>
+            <Button onClick={handlePreclose} disabled={preclosing}>
+              {preclosing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Preclosure
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PayEmiDialog
         loanId={loan.id}

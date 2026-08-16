@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
-import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee, Users, Plus, X, Undo2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { getCategoryMeta } from "@/lib/tx-meta"
@@ -43,6 +44,22 @@ type Props = {
 
 // API-normalized card item
 type CreditCardItem = { id: number; card_name: string }
+
+/** A past purchase a refund can be logged against. */
+type RefundableTxn = {
+  id: number
+  description: string
+  amount: number
+  category: string
+  transactionType: string
+  transactionDate: string | null
+  cardId: number | null
+  cardName: string | null
+  /** Only set when transactionType is Credit Card — what the original swipe counted toward. */
+  purpose: "Expense" | "Investment" | "Asset" | null
+  alreadyRefunded: number
+  splitParticipants: { id: number; personName: string; amount: number }[]
+}
 
 // The form's local TxType -> the transaction_type the categories API stores.
 // Credit-card and petty-cash spending is categorised the same way as expenses.
@@ -77,6 +94,26 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   const [purpose, setPurpose] = useState<"Expense" | "Investment" | "Asset">(
     editTransaction?.purpose ?? "Expense",
   )
+
+  // Bill Splitting — create-time only (see backend transactionService.js
+  // updateTransaction, which deliberately strips a `split` payload on edit).
+  // Each participant's share becomes a receivable in the SAME Borrowings &
+  // Lending ledger; whatever's left over is "my share" and is all that
+  // counts toward Expense totals for this transaction.
+  // Refunds & Cashback — both are CREDITS that reduce what you owe, entered
+  // as ordinary transactions with a kind flag. A refund points at the
+  // purchase it reverses (so category totals net correctly and the original
+  // can show how much came back); cashback stands alone and counts as Income.
+  const [txnKind, setTxnKind] = useState<"purchase" | "refund" | "cashback">("purchase")
+  const [refundForId, setRefundForId] = useState<string>("")
+  const [refundBeneficiaryId, setRefundBeneficiaryId] = useState<string>("")
+  const [refundables, setRefundables] = useState<RefundableTxn[]>([])
+  const [refundablesLoading, setRefundablesLoading] = useState(false)
+
+  const [splitEnabled, setSplitEnabled] = useState(false)
+  const [splitParticipants, setSplitParticipants] = useState<{ name: string; amount: string }[]>([
+    { name: "", amount: "" },
+  ])
   const [dateOpen, setDateOpen] = useState(false)
   const [dueDateOpen, setDueDateOpen] = useState(false)
   const [date, setDate] = useState<Date>(editTransaction?.date ? new Date(editTransaction.date) : new Date())
@@ -90,11 +127,22 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   const [selectedCardId, setSelectedCardId] = useState<string>("")
   const [selectedCardName, setSelectedCardName] = useState<string>(editTransaction?.cardName ?? "")
 
+  // Credit Card's category list depends on purpose, not just type — a card
+  // swipe tagged Investment or Asset should offer those categories (SIP,
+  // Chitti, Equipment, Land, ...) instead of generic Credit Card categories,
+  // both because they're more relevant AND because the resulting category
+  // becomes the linked asset's asset_type when purpose=Asset (see
+  // transactionService.syncLinkedAsset on the backend).
+  const categoryType: CategoryType =
+    type === "credit" && (purpose === "Investment" || purpose === "Asset")
+      ? purpose
+      : CATEGORY_TYPE[type]
+
   // Built-in categories merged with the user's custom ones for this type
   const {
     options: categories,
     createCategory,
-  } = useCategories(CATEGORY_TYPE[type])
+  } = useCategories(categoryType)
   const [creatingCategory, setCreatingCategory] = useState(false)
 
   /** Save a typed-in category, then select it. */
@@ -106,7 +154,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
         setCategory(created)
         toast({
           title: "Category added",
-          description: `"${created}" is now available for ${CATEGORY_TYPE[type]} transactions.`,
+          description: `"${created}" is now available for ${categoryType} transactions.`,
         })
       }
     } catch (e) {
@@ -131,6 +179,28 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   const showDueDateField     = type === "expense"
   const showStatusField      = type !== "credit" && type !== "petty-cash" && type !== "asset"
   const showPurposeField     = type === "credit"
+  // Bill Splitting: create-time only, and only for the transaction types a
+  // shared bill actually makes sense for (matches the backend's assumption
+  // in transactionClassification's effectiveAmount — Income splitting isn't
+  // built yet).
+  const showSplitField       = !editTransaction && (type === "expense" || type === "credit") && txnKind === "purchase"
+
+  // Refunds apply to any outflow you can get money back on; cashback is a
+  // card reward, so it only makes sense on a credit card.
+  const showKindField    = type === "expense" || type === "credit" || type === "petty-cash"
+  const allowCashback    = type === "credit"
+  const isRefund         = showKindField && txnKind === "refund"
+  const isCashback       = showKindField && txnKind === "cashback"
+  const isCredit         = isRefund || isCashback
+
+  const selectedRefundable = refundables.find((r) => String(r.id) === refundForId) || null
+  const refundRemaining = selectedRefundable
+    ? selectedRefundable.amount - selectedRefundable.alreadyRefunded
+    : null
+  // A warning, never a block — shipping compensation and price protection
+  // legitimately exceed the original purchase.
+  const refundExceeds =
+    refundRemaining !== null && Number(amount || 0) > refundRemaining + 0.005
 
   // Fetch credit cards from API using exact shape: data.data.data[]
   const fetchCards = async () => {
@@ -146,6 +216,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
       const normalized: CreditCardItem[] = list
         .map((c) => ({ id: Number(c?.id), card_name: String(c?.card_name ?? "") }))
         .filter((c) => Number.isFinite(c.id) && c.card_name.length > 0)
+        .sort((a, b) => a.card_name.localeCompare(b.card_name))
       setCards(normalized)
 
       // Preselect when editing a credit transaction
@@ -179,6 +250,53 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
     }
   }, [date, type])
 
+  // Cashback only exists on cards — switching away from a card transaction
+  // must not leave an impossible kind selected.
+  useEffect(() => {
+    if (txnKind === "cashback" && !allowCashback) setTxnKind("purchase")
+    if (!showKindField && txnKind !== "purchase") setTxnKind("purchase")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type])
+
+  // Load candidate purchases when the user starts logging a refund. Scoped to
+  // the selected card when there is one, so the list stays short and can't
+  // link a refund to a purchase on a different card.
+  useEffect(() => {
+    if (txnKind !== "refund") return
+    setRefundablesLoading(true)
+    // Scoped to the SAME transaction type the refund is being logged under —
+    // a card purchase refunded through an Expense-type row would never
+    // touch credit_card_payments, so the card's due wouldn't reflect money
+    // that actually came back to it.
+    const params: Record<string, string> = { transaction_type: toApiType(type) }
+    if (type === "credit" && selectedCardId) params.card_id = selectedCardId
+    apiClient(apiUrl("transaction/refundable", params))
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.status === "success") setRefundables(json.data || [])
+      })
+      .catch(() => setRefundables([]))
+      .finally(() => setRefundablesLoading(false))
+  }, [txnKind, type, selectedCardId])
+
+  // Changing which purchase is being refunded invalidates the beneficiary,
+  // who belongs to that specific purchase's split.
+  useEffect(() => {
+    setRefundBeneficiaryId("")
+  }, [refundForId])
+
+  // Inherit the original's category so the refund nets against the same line
+  // rather than leaving a phantom "Shopping ₹2,000" in the breakdown. Also
+  // inherit its Purpose (Expense/Investment/Asset) — Purpose decides which
+  // P&L bucket a refund subtracts from, so leaving it on the "Expense"
+  // default would silently reverse the wrong bucket for a refunded
+  // Investment or Asset card purchase.
+  useEffect(() => {
+    if (selectedRefundable?.category) setCategory(selectedRefundable.category)
+    if (selectedRefundable?.purpose) setPurpose(selectedRefundable.purpose)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refundForId])
+
   // Clear due date when switching away from expense type to avoid stale values
   useEffect(() => {
     if (type !== "expense") {
@@ -194,6 +312,21 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
     // If switching to credit, ensure cards loaded
     if (newType === "credit" && cards.length === 0) fetchCards()
   }
+
+  // ── Bill Splitting helpers ──────────────────────────────────────────────
+  const splitParticipantsValid = splitParticipants.filter(
+    (p) => p.name.trim() && Number(p.amount) > 0,
+  )
+  const splitParticipantsTotal = splitParticipantsValid.reduce((s, p) => s + Number(p.amount), 0)
+  const splitMyShare = Math.max(0, Number(amount || 0) - splitParticipantsTotal)
+  const splitExceedsTotal = splitParticipantsTotal > Number(amount || 0)
+
+  const updateSplitParticipant = (index: number, field: "name" | "amount", value: string) => {
+    setSplitParticipants((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
+  }
+  const addSplitParticipant = () => setSplitParticipants((prev) => [...prev, { name: "", amount: "" }])
+  const removeSplitParticipant = (index: number) =>
+    setSplitParticipants((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev))
 
   const computeExpenseType = (): "fixed" | "variable" | null => {
     if (type === "expense")    return expenseType
@@ -250,6 +383,23 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
       body.card_id = id
       body.card_name = name
       body.purpose = purpose
+    }
+
+    // Refunds & Cashback. Amount always goes up positive — the backend
+    // derives the sign from txn_kind, so nothing downstream has to guess.
+    body.txn_kind = showKindField ? txnKind : "purchase"
+    if (isRefund) {
+      body.refund_for_id = refundForId ? Number(refundForId) : null
+      body.refund_beneficiary_id = refundBeneficiaryId ? Number(refundBeneficiaryId) : null
+    }
+
+    if (showSplitField && splitEnabled && splitParticipantsValid.length > 0 && !splitExceedsTotal) {
+      body.split = {
+        participants: splitParticipantsValid.map((p) => ({
+          person_name: p.name.trim(),
+          amount: Number(p.amount),
+        })),
+      }
     }
 
     // Choose endpoint based on edit
@@ -526,12 +676,189 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
         )}
       </div>
 
+      {/* Refunds & Cashback — money coming BACK. Both reduce the card bill;
+          a refund also reverses the original expense, while cashback counts
+          as income you earned. */}
+      {showKindField && (
+        <div className="rounded-xl border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Undo2 className="h-4 w-4 text-muted-foreground" />
+            <Label>Entry type</Label>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {([
+              { key: "purchase", label: "Purchase" },
+              { key: "refund", label: "Refund" },
+              ...(allowCashback ? [{ key: "cashback", label: "Cashback" }] : []),
+            ] as const).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setTxnKind(opt.key as typeof txnKind)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors",
+                  txnKind === opt.key
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "text-muted-foreground hover:bg-accent/50",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {isCashback && (
+            <p className="text-[11px] text-muted-foreground">
+              Reduces this card&apos;s bill and counts as income. If the cycle has no spend yet, it carries
+              forward as a credit against the next one.
+            </p>
+          )}
+
+          {isRefund && (
+            <div className="space-y-3 pt-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Refund for which purchase?
+                </Label>
+                <SearchableSelect
+                  value={refundForId}
+                  onValueChange={setRefundForId}
+                  placeholder={refundablesLoading ? "Loading purchases…" : "Select the original purchase"}
+                  searchPlaceholder="Search by description…"
+                  options={refundables.map((r) => ({
+                    value: String(r.id),
+                    label: `${r.description} — ₹${r.amount.toLocaleString("en-IN")}${
+                      r.alreadyRefunded > 0
+                        ? ` (₹${r.alreadyRefunded.toLocaleString("en-IN")} already refunded)`
+                        : ""
+                    }${r.transactionDate ? ` · ${r.transactionDate}` : ""}`,
+                  }))}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Optional — leave empty if the original purchase isn&apos;t tracked here.
+                </p>
+              </div>
+
+              {refundRemaining !== null && (
+                <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Not yet refunded</span>
+                  <span className="font-semibold tnum">₹{refundRemaining.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+
+              {refundExceeds && (
+                <p className="text-[11px] text-warning-text">
+                  This is more than the outstanding amount on that purchase. That&apos;s fine if it includes
+                  shipping or compensation — just confirming it&apos;s intentional.
+                </p>
+              )}
+
+              {/* Split bills: a refund usually belongs to ONE person — the
+                  returned item was theirs — so it should shrink THEIR
+                  receivable, not your expense. */}
+              {selectedRefundable && selectedRefundable.splitParticipants.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Whose share does this refund belong to?
+                  </Label>
+                  <SearchableSelect
+                    value={refundBeneficiaryId}
+                    onValueChange={setRefundBeneficiaryId}
+                    placeholder="Mine — reduces my expense"
+                    searchPlaceholder="Search people…"
+                    options={[
+                      { value: "", label: "Mine — reduces my expense" },
+                      ...selectedRefundable.splitParticipants.map((p) => ({
+                        value: String(p.id),
+                        label: `${p.personName} — reduces what they owe me (₹${p.amount.toLocaleString("en-IN")})`,
+                      })),
+                    ]}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bill Splitting — one real payment, divided among the people it
+          actually belongs to. Each participant's share becomes a receivable
+          in the Borrowings & Lending ledger; whatever's left over is your
+          own real Expense. Create-time only. */}
+      {showSplitField && (
+        <div className="rounded-xl border p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <Label className="cursor-pointer" onClick={() => setSplitEnabled((v) => !v)}>
+                Split this bill with others
+              </Label>
+            </div>
+            <Switch checked={splitEnabled} onCheckedChange={setSplitEnabled} />
+          </div>
+
+          {splitEnabled && (
+            <div className="space-y-3 pt-1">
+              {splitParticipants.map((p, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    placeholder="Person's name"
+                    value={p.name}
+                    onChange={(e) => updateSplitParticipant(i, "name", e.target.value)}
+                    className="flex-1"
+                  />
+                  <div className="relative w-32 shrink-0">
+                    <IndianRupee className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Amount"
+                      inputMode="numeric"
+                      value={p.amount}
+                      onChange={(e) => updateSplitParticipant(i, "amount", e.target.value)}
+                      className="pl-7"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeSplitParticipant(i)}
+                    disabled={splitParticipants.length === 1}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive-text hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+
+              <Button type="button" variant="outline" size="sm" onClick={addSplitParticipant} className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> Add person
+              </Button>
+
+              <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Your share</span>
+                <span className="font-semibold tnum">
+                  ₹{splitMyShare.toLocaleString("en-IN")}
+                </span>
+              </div>
+              {splitExceedsTotal && (
+                <p className="text-[11px] text-destructive-text">
+                  Split amounts add up to more than the total bill amount.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button
+          type="submit"
+          disabled={showSplitField && splitEnabled && splitExceedsTotal}
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
           {editTransaction ? "Save Changes" : "Create"}
         </Button>
       </div>

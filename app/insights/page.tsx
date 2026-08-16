@@ -6,6 +6,7 @@ import AISummaryCard from "@/components/new-dashboard/ai-summary-card"
 import AnomalyBanner from "@/components/new-dashboard/anomaly-banner"
 import MonthSummaryCard from "@/components/new-dashboard/month-summary-card"
 import CategoryTrends from "@/components/new-dashboard/analytics/category-trends"
+import OverdueLoansBanner from "@/components/overdue-loans-banner"
 
 function Content() {
   const { filters } = useFilters()
@@ -13,6 +14,13 @@ function Content() {
   return (
     <div className="space-y-5">
       <AISummaryCard filters={filters} />
+
+      <Panel
+        title="Overdue borrowings & lendings"
+        description="Personal loans past their due date and not yet settled"
+      >
+        <OverdueLoansBanner />
+      </Panel>
 
       <Panel
         title="Spending spikes"

@@ -387,6 +387,29 @@ export default function TransactionsTable({
                           <span className="truncate text-xs text-muted-foreground">
                             {t.category}
                           </span>
+                          {t.splitOwnShare != null && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                              title={`Split bill — your share: ₹${Math.round(t.splitOwnShare).toLocaleString("en-IN")}`}
+                            >
+                              Split · ₹{Math.round(t.splitOwnShare).toLocaleString("en-IN")}
+                            </span>
+                          )}
+                          {/* Money coming BACK — visually distinct from a
+                              spend so a refund can't be misread as another
+                              purchase of the same thing. */}
+                          {(t.txnKind === "refund" || t.txnKind === "cashback") && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success-subtle px-1.5 py-0.5 text-xs font-medium text-success-subtle-foreground"
+                              title={
+                                t.txnKind === "refund"
+                                  ? "Refund — reverses the original purchase"
+                                  : "Cashback — counts as income and reduces the card bill"
+                              }
+                            >
+                              {t.txnKind === "refund" ? "↩ Refund" : "★ Cashback"}
+                            </span>
+                          )}
                           {showCardBadge && t.type === "credit" && t.cardName && (
                             <span
                               className={cn(

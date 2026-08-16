@@ -86,7 +86,22 @@ export function getCategoryMeta(category: string): CategoryMeta {
 
 // ─── Transaction type metadata ────────────────────────────────────────────────
 
-export type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "asset" | "summary"
+export type TxType =
+  | "income"
+  | "expense"
+  | "credit"
+  | "petty-cash"
+  | "investment"
+  | "asset"
+  | "summary"
+  // Borrowings & Lending — balance-sheet movements (a receivable/payable
+  // changing hands), never Income/Expense/Investment. See the "lending"
+  // module for why: giving money away isn't a cost, getting it back isn't
+  // earnings, same in reverse for borrowing.
+  | "lending"
+  | "lending-repayment"
+  | "borrowing"
+  | "borrowing-repayment"
 
 export interface TypeColor {
   emoji: string
@@ -160,6 +175,42 @@ export const TYPE_COLORS: Record<TxType, TypeColor> = {
     chartVar:     "hsl(var(--chart-1))",
     amountPrefix: "",
     label:        "Asset",
+  },
+  lending: {
+    emoji:        "🤝",
+    iconColor:    "#64748b", // slate-500 — deliberately neutral, not destructive-red: this isn't a real expense
+    amountText:   "text-muted-foreground",
+    badgeClass:   "bg-muted text-muted-foreground",
+    chartVar:     "hsl(var(--chart-1))",
+    amountPrefix: "−",
+    label:        "Lending",
+  },
+  "lending-repayment": {
+    emoji:        "🤝",
+    iconColor:    "#3b82f6", // blue-500
+    amountText:   "text-info-text",
+    badgeClass:   "bg-info-subtle text-info-subtle-foreground",
+    chartVar:     "hsl(var(--chart-5))",
+    amountPrefix: "+",
+    label:        "Lending Repayment",
+  },
+  borrowing: {
+    emoji:        "🙏",
+    iconColor:    "#f59e0b", // amber-500 — a liability, not income, even though cash is coming in
+    amountText:   "text-warning-text",
+    badgeClass:   "bg-warning-subtle text-warning-subtle-foreground",
+    chartVar:     "hsl(var(--chart-2))",
+    amountPrefix: "+",
+    label:        "Borrowing",
+  },
+  "borrowing-repayment": {
+    emoji:        "🙏",
+    iconColor:    "#64748b", // slate-500 — neutral, not a real expense
+    amountText:   "text-muted-foreground",
+    badgeClass:   "bg-muted text-muted-foreground",
+    chartVar:     "hsl(var(--chart-1))",
+    amountPrefix: "−",
+    label:        "Borrowing Repayment",
   },
   summary: {
     emoji:        "📊",

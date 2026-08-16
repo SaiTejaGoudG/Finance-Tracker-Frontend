@@ -1,7 +1,7 @@
 "use client"
 
 import { format, parseISO } from "date-fns"
-import { Calendar, CreditCard, DollarSign, FileText, Tag, Clock, Info } from "lucide-react"
+import { Calendar, CreditCard, DollarSign, FileText, Tag, Clock, Info, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +10,71 @@ import StatusBadge from "@/components/status-badge"
 import type { Transaction } from "./dashboard"
 import CreditCardPaymentDialog from "./credit-card-payment-dialog"
 import { isSyntheticId, SYNTHETIC_ROW_MESSAGE } from "@/lib/tx-id"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { apiClient } from "@/lib/apiClient"
+import { apiUrl } from "@/lib/api"
+
+interface BillSplitParticipant {
+  id: number
+  person_name: string
+  amount: string | number
+  personal_loan_id: number | null
+}
+
+interface BillSplitDetail {
+  total_amount: string | number
+  my_share: string | number
+  participants: BillSplitParticipant[]
+}
+
+function BillSplitSection({ transactionId }: { transactionId: string }) {
+  const [detail, setDetail] = useState<BillSplitDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    apiClient(apiUrl(`/bill-splits/${transactionId}`))
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json.status === "success") setDetail(json.data)
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [transactionId])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading split details…</p>
+  if (!detail) return null
+
+  const fmt = (n: string | number) => `₹${Math.round(Number(n)).toLocaleString("en-IN")}`
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        <Users className="h-4 w-4 text-muted-foreground" />
+        <div className="font-medium">Split with others</div>
+      </div>
+      <div className="rounded-lg border divide-y">
+        <div className="flex items-center justify-between px-3 py-2 text-sm">
+          <span>Your share</span>
+          <span className="font-semibold tnum">{fmt(detail.my_share)}</span>
+        </div>
+        {detail.participants.map((p) => (
+          <div key={p.id} className="flex items-center justify-between px-3 py-2 text-sm">
+            <span className="text-muted-foreground">{p.person_name}</span>
+            <span className="font-semibold tnum">{fmt(p.amount)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Each person's share is tracked as a receivable in the Borrowings &amp; Lending tab.
+      </p>
+    </div>
+  )
+}
 
 type TransactionViewDialogProps = {
   transaction: Transaction | null
@@ -157,6 +221,13 @@ export default function TransactionViewDialog({
               </div>
             </div>
           </div>
+
+          {transaction.splitOwnShare != null && (
+            <>
+              <Separator />
+              <BillSplitSection transactionId={transaction.id} />
+            </>
+          )}
 
           <Separator />
 

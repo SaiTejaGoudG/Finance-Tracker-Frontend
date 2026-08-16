@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Plus, MapPin, Building2, Gem, Car, Wrench, Package,
   TrendingUp, IndianRupee, Link2, ArrowUpRight, ArrowDownRight, Info, Pencil,
+  Tag, Loader2,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { apiClient } from "@/lib/apiClient"
@@ -453,6 +454,147 @@ function EditAssetDialog({
   )
 }
 
+// ─── Sell asset ───────────────────────────────────────────────────────────────
+// Backend (PATCH /assets/:id/sell) already existed — it just had no caller
+// anywhere in this file. Marking an asset sold turns it from a still-owned
+// holding into a realised gain/loss and drops it out of "active" here.
+
+function SellAssetDialog({
+  asset,
+  setAssets,
+}: {
+  asset: Asset
+  setAssets: React.Dispatch<React.SetStateAction<Asset[]>>
+}) {
+  const [open, setOpen]           = useState(false)
+  const [soldPrice, setSoldPrice] = useState(String(asset.currentValue))
+  const [soldDate, setSoldDate]   = useState(format(new Date(), "yyyy-MM-dd"))
+  const [notes, setNotes]         = useState("")
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+
+  const priceNum = Number(soldPrice)
+  const gain     = priceNum - asset.purchasePrice
+  const isValid  = priceNum > 0
+
+  const handleOpenChange = (v: boolean) => {
+    if (v) {
+      setSoldPrice(String(asset.currentValue))
+      setSoldDate(format(new Date(), "yyyy-MM-dd"))
+      setNotes("")
+      setError(null)
+    }
+    setOpen(v)
+  }
+
+  const handleSell = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await apiClient(apiUrl(`/assets/${asset.id}/sell`), {
+        method: "PATCH",
+        body: JSON.stringify({
+          sold_price: priceNum,
+          sold_date: soldDate,
+          notes: notes.trim() || undefined,
+        }),
+      })
+      if (res.ok) {
+        const listRes = await apiClient(apiUrl("/assets/listing"))
+        if (listRes.ok) {
+          const json = await listRes.json()
+          if (json.data?.length) setAssets(json.data.map(transformApiAsset))
+        }
+        setOpen(false)
+      } else {
+        const j = await res.json().catch(() => ({}))
+        setError(j.message || "Failed to record the sale. Please try again.")
+      }
+    } catch {
+      setError("Failed to record the sale. Please try again.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <button
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Mark as sold"
+        >
+          <Tag className="h-3.5 w-3.5" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>Sell {asset.name}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Sale Price (₹)</Label>
+            <div className="relative">
+              <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9"
+                inputMode="numeric"
+                value={soldPrice}
+                onChange={(e) => setSoldPrice(e.target.value)}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Purchased for {fmtINR(asset.purchasePrice)}
+              {isValid && (
+                <>
+                  {" · "}
+                  <span className={gain >= 0 ? "text-success-text" : "text-destructive-text"}>
+                    {gain >= 0 ? "Gain" : "Loss"} of {fmtINR(Math.abs(gain))}
+                  </span>
+                </>
+              )}
+            </p>
+            {isValid && gain > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                Only the {fmtINR(gain)} gain is booked as Income — getting your original{" "}
+                {fmtINR(asset.purchasePrice)} back isn&apos;t earnings.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Sale Date</Label>
+            <Input type="date" value={soldDate} onChange={(e) => setSoldDate(e.target.value)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Notes (optional)</Label>
+            <Textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Sold to a neighbor"
+            />
+          </div>
+
+          {error && <p className="text-xs text-destructive-text">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button disabled={!isValid || saving} onClick={handleSell}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Confirm Sale
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Asset card ───────────────────────────────────────────────────────────────
 
 function AssetCard({
@@ -464,7 +606,7 @@ function AssetCard({
   availableLoans: { id: string; label: string }[]
   setAssets: React.Dispatch<React.SetStateAction<Asset[]>>
 }) {
-  const cfg     = TYPE_CFG[asset.assetType]
+  const cfg     = TYPE_CFG[asset.assetType] ?? TYPE_CFG["Other Asset"]
   const gain    = asset.currentValue - asset.purchasePrice
   const gainPct = asset.purchasePrice > 0 ? (gain / asset.purchasePrice) * 100 : 0
   const up      = gain >= 0
@@ -501,6 +643,7 @@ function AssetCard({
           {/* Value + gain + edit */}
           <div className="flex flex-col items-end gap-1 shrink-0">
             <div className="flex items-center gap-1.5">
+              {asset.status === "active" && <SellAssetDialog asset={asset} setAssets={setAssets} />}
               <EditAssetDialog asset={asset} availableLoans={availableLoans} setAssets={setAssets} />
               <p className="text-lg font-bold tnum">{fmtINR(asset.currentValue)}</p>
             </div>

@@ -4,6 +4,7 @@ import { apiUrl } from "@/lib/api"
 import { apiClient } from "@/lib/apiClient"
 import { useState, useEffect, useRef } from "react"
 import { format, parseISO } from "date-fns"
+import type { DateRange } from "react-day-picker"
 import { Plus, ReceiptText, SearchX, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toTransactionId, SYNTHETIC_ROW_MESSAGE } from "@/lib/tx-id"
@@ -45,6 +46,14 @@ type ApiTransaction = {
   // for (Expense/Investment/Asset), since Credit Card is a payment method
   // rather than a spending purpose.
   purpose?: "Expense" | "Investment" | "Asset" | null
+  // Bill Splitting — set only when this transaction was split with others;
+  // the portion of `amount` that's actually the user's own Expense/Income.
+  // null on every non-split transaction.
+  split_own_share?: number | null
+  // Refunds & Cashback — money coming BACK. `amount` stays positive; this
+  // says which direction it actually moves.
+  txn_kind?: "purchase" | "refund" | "cashback" | null
+  refund_for_id?: number | null
 }
 
 type TransactionsListingResponse = {
@@ -71,7 +80,17 @@ export type Transaction = {
   id: string
   description: string
   amount: number
-  type: "income" | "expense" | "credit" | "petty-cash" | "investment" | "summary"
+  type:
+    | "income"
+    | "expense"
+    | "credit"
+    | "petty-cash"
+    | "investment"
+    | "summary"
+    | "lending"
+    | "lending-repayment"
+    | "borrowing"
+    | "borrowing-repayment"
   category: string
   date: string
   dueDate?: string
@@ -82,16 +101,25 @@ export type Transaction = {
   purpose?: "Expense" | "Investment" | "Asset" | null
   isSummary?: boolean
   summaryType?: "credit" | "petty-cash" | "investment"
+  /** Bill Splitting — only your share of `amount`; null if not split. */
+  splitOwnShare?: number | null
+  /** Refunds & Cashback — a credit back to the account, not a spend. */
+  txnKind?: "purchase" | "refund" | "cashback" | null
+  refundForId?: number | null
 }
 
 // Map API transaction_type string → frontend TxType
 const apiTypeToTxType = (apiType: string): Transaction["type"] => {
   switch (apiType) {
-    case "Credit Card":  return "credit"
-    case "Petty Cash":   return "petty-cash"
-    case "Income":       return "income"
-    case "Investment":   return "investment"
-    default:             return "expense"
+    case "Credit Card":          return "credit"
+    case "Petty Cash":           return "petty-cash"
+    case "Income":                return "income"
+    case "Investment":            return "investment"
+    case "Lending":                return "lending"
+    case "Lending Repayment":      return "lending-repayment"
+    case "Borrowing":              return "borrowing"
+    case "Borrowing Repayment":    return "borrowing-repayment"
+    default:                       return "expense"
   }
 }
 
@@ -116,6 +144,9 @@ const convertApiTransactionToLegacy = (apiTransaction: ApiTransaction): Transact
     ownerType: apiTransaction.owner_type ?? "self",
     expenseType: (apiTransaction.expense_type as "fixed" | "variable" | null) ?? null,
     purpose: apiTransaction.purpose ?? null,
+    splitOwnShare: apiTransaction.split_own_share ?? null,
+    txnKind: apiTransaction.txn_kind ?? "purchase",
+    refundForId: apiTransaction.refund_for_id ?? null,
   }
 }
 
@@ -128,6 +159,10 @@ function TransactionsPageContent() {
   >("all-transactions")
   const [transactions, setTransactions] = useState<ApiTransaction[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  // Custom "from – to" date range for All Transactions — additive to the
+  // month/year navigator below; when both ends are set, it overrides the
+  // month for filtering purposes (see fetchTransactions).
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
 
   // Use current month instead of hardcoded June
   const currentDate = new Date()
@@ -269,6 +304,14 @@ function TransactionsPageContent() {
         params.append("transaction_type", transactionType)
       }
 
+      // Custom date range — only exposed (and only applied) on the All
+      // Transactions tab, so it can't silently keep filtering other tabs
+      // after switching away with no visible control showing it's active.
+      if (activeTab === "all-transactions" && dateRange?.from && dateRange?.to) {
+        params.append("from_date", format(dateRange.from, "yyyy-MM-dd"))
+        params.append("to_date", format(dateRange.to, "yyyy-MM-dd"))
+      }
+
       // Repeated keys — Express parses these into an array on req.query,
       // and the backend already turns an array filter into a whereIn().
       categories.forEach((c) => {
@@ -344,7 +387,7 @@ function TransactionsPageContent() {
     const cardIds = getActiveCardIds()
 
     fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
-  }, [activeTab, selectedMonth, selectedCategories, selectedCards])
+  }, [activeTab, selectedMonth, selectedCategories, selectedCards, dateRange])
 
   const handleMonthSelect = (month: Date) => {
     setSelectedMonth(month)
@@ -676,11 +719,18 @@ function TransactionsPageContent() {
   const hasSearchFilter = searchTerm.trim().length > 0
 
   const pageLocalTotals = (() => {
+    // "Inflow" here means real cash coming in, not strictly P&L income —
+    // Borrowing (you received money) and Lending Repayment (getting your
+    // own money back) are cash-in too, even though neither is income.
+    // Mirrors the backend's totalIncome/totalOutflow split in
+    // transactionService.getAllTransactions.
+    const isInflow = (t: Transaction) =>
+      t.type === "income" || t.type === "borrowing" || t.type === "lending-repayment"
     const inflow = legacyTransactions
-      .filter((t) => t.type === "income")
+      .filter(isInflow)
       .reduce((sum, t) => sum + t.amount, 0)
     const outflow = legacyTransactions
-      .filter((t) => t.type !== "income")
+      .filter((t) => !isInflow(t))
       .reduce((sum, t) => sum + t.amount, 0)
     return {
       inflow,
@@ -732,7 +782,11 @@ function TransactionsPageContent() {
   // Get unique credit cards for credit card tab
   // From the real card list, not the loaded page of transactions — a card
   // with no transactions yet this month should still be filterable.
-  const creditCards = creditCardsList.map((c) => c.card_name)
+  // Sorted alphabetically so the dropdown is easy to scan rather than
+  // ordered by whenever each card happened to be added.
+  const creditCards = creditCardsList
+    .map((c) => c.card_name)
+    .sort((a, b) => a.localeCompare(b))
 
   // Get tab title
   const getTabTitle = () => {
@@ -893,6 +947,9 @@ function TransactionsPageContent() {
                 selectedCards={selectedCards}
                 onCardsChange={setSelectedCards}
                 cards={creditCards}
+                showDateFilter={activeTab === "all-transactions"}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
                 density={density}
                 onDensityChange={setDensity}
                 resultCount={legacyTransactions.length}

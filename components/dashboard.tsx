@@ -93,6 +93,7 @@ export type Transaction = {
   description: string
   amount: number
   type: "income" | "expense" | "credit" | "petty-cash" | "investment" | "summary"
+    | "lending" | "lending-repayment" | "borrowing" | "borrowing-repayment"
   category: string
   date: string
   dueDate?: string
@@ -103,6 +104,11 @@ export type Transaction = {
   ownerType?: string
   expenseType?: string
   payment_id?: number // Added payment_id field for credit card transactions
+  /** Bill Splitting — only your share of `amount`; undefined/null if not split. */
+  splitOwnShare?: number | null
+  /** Refunds & Cashback — a credit back to the account, not a spend. */
+  txnKind?: "purchase" | "refund" | "cashback" | null
+  refundForId?: number | null
 }
 
 // ─── Categories ───────────────────────────────────────────────────────────────

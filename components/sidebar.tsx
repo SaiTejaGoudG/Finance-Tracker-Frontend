@@ -34,6 +34,7 @@ import {
   Landmark,
   Building2,
   Sparkles,
+  HandCoins,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 
@@ -47,6 +48,7 @@ const NAV: NavGroup[] = [
       { title: "Dashboard", href: "/dashboard", icon: BarChart2 },
       { title: "Overview", href: "/overview", icon: LayoutDashboard },
       { title: "All Transactions", href: "/transactions", icon: CreditCard },
+      { title: "Billing Cycles", href: "/credit-cards", icon: Wallet },
     ],
   },
   {
@@ -64,6 +66,7 @@ const NAV: NavGroup[] = [
       { title: "Savings", href: "/savings", icon: PiggyBank },
       { title: "Loans", href: "/loans", icon: Landmark },
       { title: "Assets", href: "/assets", icon: Building2 },
+      { title: "Borrowings & Lending", href: "/lending", icon: HandCoins },
     ],
   },
   {

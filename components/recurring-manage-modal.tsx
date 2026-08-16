@@ -97,7 +97,8 @@ export default function RecurringManageModal({ open, onClose }: Props) {
     try {
       const res = await apiClient(apiUrl("configurations/listing"))
       const json = await res.json()
-      setCards(json.data || [])
+      const list: CreditCard[] = json.data || []
+      setCards([...list].sort((a, b) => a.card_name.localeCompare(b.card_name)))
     } catch { /* non-fatal */ }
   }
 
