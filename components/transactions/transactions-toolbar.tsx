@@ -24,7 +24,13 @@ export type Density = "comfortable" | "compact"
 // exact span of days is what's actually sent to the backend instead of the
 // whole selected month.
 
-function DateRangeFilter({
+/**
+ * Exported so other screens with a date-range filter (the Business ledger)
+ * reuse this exact control instead of growing a second, slightly-different
+ * range picker. Note there's also components/new-dashboard/date-range-filter
+ * — that one drives the shared URL filters context, not a local DateRange.
+ */
+export function DateRangeFilter({
   range,
   onRangeChange,
   disabled,
@@ -186,6 +192,11 @@ interface ToolbarProps {
   onCardsChange?: (v: string[]) => void
   cards?: string[]
 
+  showOwnerFilter?: boolean
+  selectedOwners?: string[]
+  onOwnersChange?: (v: string[]) => void
+  owners?: string[]
+
   showDateFilter?: boolean
   dateRange?: DateRange
   onDateRangeChange?: (r: DateRange | undefined) => void
@@ -224,6 +235,10 @@ export default function TransactionsToolbar({
   selectedCards = [],
   onCardsChange,
   cards = [],
+  showOwnerFilter,
+  selectedOwners = [],
+  onOwnersChange,
+  owners = [],
   showDateFilter,
   dateRange,
   onDateRangeChange,
@@ -238,15 +253,21 @@ export default function TransactionsToolbar({
 }: ToolbarProps) {
   const hasCategoryFilter = selectedCategories.length > 0
   const hasCardFilter = selectedCards.length > 0
+  const hasOwnerFilter = selectedOwners.length > 0
   const hasSearch = searchTerm.trim().length > 0
   const hasDateFilter = Boolean(dateRange?.from && dateRange?.to)
   const activeCount =
-    (hasCategoryFilter ? 1 : 0) + (hasCardFilter ? 1 : 0) + (hasSearch ? 1 : 0) + (hasDateFilter ? 1 : 0)
+    (hasCategoryFilter ? 1 : 0) +
+    (hasCardFilter ? 1 : 0) +
+    (hasOwnerFilter ? 1 : 0) +
+    (hasSearch ? 1 : 0) +
+    (hasDateFilter ? 1 : 0)
 
   const clearAll = () => {
     onSearchChange("")
     onCategoriesChange([])
     onCardsChange?.([])
+    onOwnersChange?.([])
     onDateRangeChange?.(undefined)
   }
 
@@ -299,6 +320,23 @@ export default function TransactionsToolbar({
                 placeholder="All cards"
                 searchPlaceholder="Search card…"
                 options={cards.map((c) => ({ value: c, label: c }))}
+              />
+            </div>
+          )}
+
+          {showOwnerFilter && owners.length > 0 && (
+            <div className="w-full sm:w-40">
+              <MultiSelect
+                values={selectedOwners}
+                onValuesChange={(v) => onOwnersChange?.(v)}
+                disabled={disabled}
+                placeholder="All owners"
+                searchPlaceholder="Search owner…"
+                options={owners.map((o) => ({
+                  value: o,
+                  // Stored lowercase ('self', 'brother'); title-case for display.
+                  label: o.charAt(0).toUpperCase() + o.slice(1),
+                }))}
               />
             </div>
           )}
@@ -391,6 +429,14 @@ export default function TransactionsToolbar({
                 label="Card"
                 value={c}
                 onClear={() => onCardsChange?.(selectedCards.filter((x) => x !== c))}
+              />
+            ))}
+            {selectedOwners.map((o) => (
+              <FilterChip
+                key={`owner-${o}`}
+                label="Owner"
+                value={o.charAt(0).toUpperCase() + o.slice(1)}
+                onClear={() => onOwnersChange?.(selectedOwners.filter((x) => x !== o))}
               />
             ))}
             {hasDateFilter && dateRange?.from && dateRange?.to && (

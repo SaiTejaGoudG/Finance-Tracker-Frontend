@@ -84,6 +84,8 @@ import { apiUrl } from "@/lib/api"
 import { EmptyState } from "@/components/ui/states"
 import { toast } from "@/hooks/use-toast"
 import { useAllCustomCategories } from "@/hooks/use-categories"
+import type { DateRange } from "react-day-picker"
+import { DateRangeFilter } from "@/components/transactions/transactions-toolbar"
 import { getCategoryMeta, getTypeColor } from "@/lib/tx-meta"
 import { getCardColor } from "@/lib/card-meta"
 import { groupByDate } from "@/lib/group-transactions"
@@ -119,12 +121,61 @@ interface LedgerTxnRow {
   id: number
   description: string
   category: string
+  /** P&L bucket the row was counted under — NOT the raw transaction_type. */
   type: "income" | "expense" | "investment" | "asset"
   cardName: string | null
   date: string
   status: "Pending" | "Paid" | "Overdue"
+  /** Signed effective amount, used for display and day subtotals. */
   amount: number
   txnKind: "purchase" | "refund" | "cashback"
+  // Passthrough fields, only used to prefill the edit form.
+  transactionType?: string
+  purpose?: "Expense" | "Investment" | "Asset" | null
+  cardId?: number | null
+  dueDate?: string | null
+  ownerType?: string | null
+  expenseType?: "fixed" | "variable" | null
+  /** Raw stored amount — what the user originally typed. */
+  rawAmount?: number
+}
+
+/** Form's TxType keys. */
+type EditableTxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "asset"
+
+/**
+ * transaction_type -> the transaction form's own type key. Has to go through
+ * the RAW type, not the P&L bucket: a Credit Card charge with
+ * purpose=Investment buckets as "investment" but must reopen as a Credit
+ * Card row, or saving it would silently convert it into a bank-funded
+ * investment and drop it off the card's bill.
+ */
+const FORM_TYPE_BY_TXN_TYPE: Record<string, EditableTxType> = {
+  Income: "income",
+  Expense: "expense",
+  "Credit Card": "credit",
+  "Petty Cash": "petty-cash",
+  Investment: "investment",
+  Asset: "asset",
+}
+
+function toEditTransaction(row: LedgerTxnRow) {
+  const formType: EditableTxType =
+    (row.transactionType && FORM_TYPE_BY_TXN_TYPE[row.transactionType]) || row.type
+  return {
+    id: String(row.id),
+    description: row.description,
+    amount: Math.abs(row.rawAmount ?? row.amount),
+    type: formType,
+    category: row.category,
+    date: row.date,
+    dueDate: row.dueDate || undefined,
+    status: row.status === "Paid" ? ("Paid" as const) : ("Pending" as const),
+    cardName: row.cardName || undefined,
+    ownerType: row.ownerType ?? null,
+    expenseType: row.expenseType ?? null,
+    purpose: row.purpose ?? null,
+  }
 }
 
 interface LedgerSummary {
@@ -453,7 +504,9 @@ export default function BusinessTab() {
   const [editingLedger, setEditingLedger] = useState<Ledger | undefined>(undefined)
   const [deleting, setDeleting] = useState(false)
   const [txnFormOpen, setTxnFormOpen] = useState(false)
+  const [editingTxn, setEditingTxn] = useState<LedgerTxnRow | null>(null)
   const [txnTypeTab, setTxnTypeTab] = useState<"all" | "income" | "investment" | "expense">("all")
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
 
   const { custom: customCategories } = useAllCustomCategories()
 
@@ -486,9 +539,13 @@ export default function BusinessTab() {
 
   // groupByDate requires a string id — the ledger rows come back from the
   // API with numeric ids, so map them rather than widen the shared type.
+  // `source` carries the untouched row through so a row click still has the
+  // real numeric id (and every edit-form field) to work with.
   const ledgerGroups = useMemo(() => {
     if (!filteredTransactions.length) return []
-    return groupByDate(filteredTransactions.map((t) => ({ ...t, id: String(t.id) })))
+    return groupByDate(
+      filteredTransactions.map((t) => ({ ...t, id: String(t.id), source: t })),
+    )
   }, [filteredTransactions])
 
   const fetchLedgers = useCallback(async () => {
@@ -510,10 +567,17 @@ export default function BusinessTab() {
     fetchLedgers()
   }, [fetchLedgers])
 
-  const fetchSummary = useCallback(async (id: number) => {
+  const fetchSummary = useCallback(async (id: number, range?: DateRange) => {
     setLoadingSummary(true)
     try {
-      const res = await apiClient(apiUrl(`business-ledgers/${id}/summary`))
+      // The backend filters by transaction_date, so the totals, the chart and
+      // the list all narrow together — no client-side re-slicing needed.
+      const params: Record<string, string> = {}
+      if (range?.from && range?.to) {
+        params.start_date = format(range.from, "yyyy-MM-dd")
+        params.end_date = format(range.to, "yyyy-MM-dd")
+      }
+      const res = await apiClient(apiUrl(`business-ledgers/${id}/summary`, params))
       const json = await res.json().catch(() => ({}))
       if (res.ok && json?.status === "success") {
         setSummary(json.data)
@@ -529,14 +593,14 @@ export default function BusinessTab() {
 
   useEffect(() => {
     if (selectedId != null) {
-      fetchSummary(selectedId)
+      fetchSummary(selectedId, dateRange)
     } else {
       setSummary(null)
     }
     // Switching businesses shouldn't carry over a filter that might not
     // apply / might silently show an empty list for the new ledger.
     setTxnTypeTab("all")
-  }, [selectedId, fetchSummary])
+  }, [selectedId, dateRange, fetchSummary])
 
   const selectedLedger = ledgers.find((l) => l.id === selectedId)
 
@@ -546,7 +610,7 @@ export default function BusinessTab() {
       return exists ? prev.map((l) => (l.id === ledger.id ? ledger : l)) : [...prev, ledger]
     })
     setSelectedId(ledger.id)
-    fetchSummary(ledger.id)
+    fetchSummary(ledger.id, dateRange)
   }
 
   const handleDelete = async () => {
@@ -610,10 +674,20 @@ export default function BusinessTab() {
           New business
         </Button>
 
-        <Button variant="outline" onClick={() => setTxnFormOpen(true)}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setEditingTxn(null)
+            setTxnFormOpen(true)
+          }}
+        >
           <Plus className="mr-1.5 h-4 w-4" />
           Add transaction
         </Button>
+
+        {selectedLedger && (
+          <DateRangeFilter range={dateRange} onRangeChange={setDateRange} disabled={loadingSummary} />
+        )}
 
         {selectedLedger && (
           <>
@@ -797,7 +871,15 @@ export default function BusinessTab() {
                       const cardColor = getCardColor(item.cardName)
 
                       return (
-                        <tr key={item.id}>
+                        <tr
+                          key={item.id}
+                          onClick={() => {
+                            setEditingTxn(item.source)
+                            setTxnFormOpen(true)
+                          }}
+                          title="Click to edit this transaction"
+                          className="cursor-pointer transition-colors hover:bg-muted/50"
+                        >
                           <td className="px-4 py-2.5">
                             <div className="flex min-w-0 items-center gap-3">
                               <span
@@ -888,21 +970,34 @@ export default function BusinessTab() {
         onSaved={handleSaved}
       />
 
-      {/* TransactionForm does its own create API call — this just closes the
-          dialog and refreshes whichever ledger is currently selected, since
-          the new transaction might match its categories. */}
-      <Dialog open={txnFormOpen} onOpenChange={setTxnFormOpen}>
+      {/* TransactionForm does its own create/update API call — this just
+          closes the dialog and refreshes whichever ledger is selected, since
+          the row may have moved in or out of its categories. Shared by the
+          "Add transaction" button and row clicks; editingTxn decides which. */}
+      <Dialog
+        open={txnFormOpen}
+        onOpenChange={(open) => {
+          setTxnFormOpen(open)
+          if (!open) setEditingTxn(null)
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add transaction</DialogTitle>
+            <DialogTitle>{editingTxn ? "Edit transaction" : "Add transaction"}</DialogTitle>
           </DialogHeader>
           <TransactionForm
+            editTransaction={editingTxn ? toEditTransaction(editingTxn) : null}
             onSubmit={async () => {
+              const wasEdit = Boolean(editingTxn)
               setTxnFormOpen(false)
-              toast({ title: "Transaction added" })
-              if (selectedId != null) fetchSummary(selectedId)
+              setEditingTxn(null)
+              toast({ title: wasEdit ? "Transaction updated" : "Transaction added" })
+              if (selectedId != null) fetchSummary(selectedId, dateRange)
             }}
-            onCancel={() => setTxnFormOpen(false)}
+            onCancel={() => {
+              setTxnFormOpen(false)
+              setEditingTxn(null)
+            }}
           />
         </DialogContent>
       </Dialog>

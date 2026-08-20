@@ -17,6 +17,7 @@ import { format } from "date-fns"
 import { getCategoryMeta } from "@/lib/tx-meta"
 import { useToast } from "@/components/ui/use-toast"
 import { useCategories, type CategoryType } from "@/hooks/use-categories"
+import { ownerTypes as OWNER_TYPES } from "@/lib/data"
 
 type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "asset"
 type StatusType = "Pending" | "Paid"
@@ -72,7 +73,6 @@ const CATEGORY_TYPE: Record<TxType, CategoryType> = {
   asset:        "Asset",
 }
 
-const OWNER_TYPES = ["self", "brother", "friend", "other"]
 const EXPENSE_TYPES: Array<"fixed" | "variable"> = ["fixed", "variable"]
 
 // Credit Card is a payment method, not a spending purpose — a card swipe
@@ -179,11 +179,18 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
   const showDueDateField     = type === "expense"
   const showStatusField      = type !== "credit" && type !== "petty-cash" && type !== "asset"
   const showPurposeField     = type === "credit"
-  // Bill Splitting: create-time only, and only for the transaction types a
-  // shared bill actually makes sense for (matches the backend's assumption
-  // in transactionClassification's effectiveAmount — Income splitting isn't
-  // built yet).
-  const showSplitField       = !editTransaction && (type === "expense" || type === "credit") && txnKind === "purchase"
+  // Bill Splitting: create-time only (the edit path deliberately strips
+  // splits server-side), and only for outflow types where a shared bill
+  // actually makes sense — Income splitting isn't built.
+  //
+  // Petty Cash is included: the backend never restricted splits by type, and
+  // effectiveAmount() reads split_own_share regardless of type while
+  // isExpenseBucket() already counts 'Petty Cash', so a petty-cash split
+  // aggregates correctly everywhere. Splitting a small cash spend (auto
+  // fare, snacks for the group) is one of the commonest real cases.
+  const showSplitField       = !editTransaction
+    && (type === "expense" || type === "credit" || type === "petty-cash")
+    && txnKind === "purchase"
 
   // Refunds apply to any outflow you can get money back on; cashback is a
   // card reward, so it only makes sense on a credit card.

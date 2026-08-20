@@ -16,7 +16,11 @@ import * as LucideIcons from "lucide-react"
 
 export default function PettyCashPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date(2025, 2, 1)) // March 2025
+  // Was hardcoded to March 2025 while the picker seeded itself from today,
+  // so the label and the rows it filtered disagreed on open.
+  const [selectedMonth, setSelectedMonth] = useState<Date>(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  )
   const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null)
@@ -127,7 +131,7 @@ export default function PettyCashPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold">Petty Cash</h1>
-          <MonthCalendar onMonthSelect={handleMonthSelect} />
+          <MonthCalendar onMonthSelect={handleMonthSelect} value={selectedMonth} />
         </div>
 
         <Button variant="outline" size="sm" onClick={toggleSortDirection} className="flex items-center gap-2">

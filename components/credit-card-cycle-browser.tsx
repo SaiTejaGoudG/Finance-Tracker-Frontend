@@ -20,9 +20,13 @@ import { apiUrl } from "@/lib/api"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EmptyState, SkeletonText } from "@/components/ui/states"
-import { CreditCard as CreditCardIcon, Calendar, IndianRupee } from "lucide-react"
+import { CreditCard as CreditCardIcon, Calendar, IndianRupee, Plus } from "lucide-react"
 import { format, parseISO } from "date-fns"
+import { toast } from "@/hooks/use-toast"
+import TransactionForm from "@/components/transaction-form"
 import { cn } from "@/lib/utils"
 
 interface CardOption {
@@ -82,11 +86,14 @@ export default function CreditCardCycleBrowser({
   const [detail, setDetail] = useState<CycleDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  const loadCycles = useCallback((cardId: string) => {
+  const [txnFormOpen, setTxnFormOpen] = useState(false)
+
+  // Just fetches — deliberately does NOT clear the current cycle selection,
+  // so it can also be used to refresh totals in place after adding a
+  // transaction. Clearing on card change is the effect's job below.
+  const fetchCycles = useCallback((cardId: string) => {
     setCyclesLoading(true)
-    setSelectedDueDate("")
-    setDetail(null)
-    apiClient(apiUrl(`credit-cards/${cardId}/billing-cycles`))
+    return apiClient(apiUrl(`credit-cards/${cardId}/billing-cycles`))
       .then((r) => r.json())
       .then((json) => {
         if (json.status === "success") setCycles(json.data || [])
@@ -96,8 +103,11 @@ export default function CreditCardCycleBrowser({
   }, [])
 
   useEffect(() => {
-    if (selectedCardId) loadCycles(selectedCardId)
-    else {
+    if (selectedCardId) {
+      setSelectedDueDate("")
+      setDetail(null)
+      fetchCycles(selectedCardId)
+    } else {
       setCycles([])
       setSelectedDueDate("")
       setDetail(null)
@@ -105,23 +115,46 @@ export default function CreditCardCycleBrowser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCardId])
 
-  useEffect(() => {
-    if (!selectedCardId || !selectedDueDate) return
+  // Extracted from an inline effect so adding a transaction can re-run it
+  // without having to fake a dependency change.
+  const fetchDetail = useCallback((cardId: string, dueDate: string) => {
     setDetailLoading(true)
-    apiClient(apiUrl(`credit-cards/${selectedCardId}/billing-cycles/${selectedDueDate}/transactions`))
+    return apiClient(apiUrl(`credit-cards/${cardId}/billing-cycles/${dueDate}/transactions`))
       .then((r) => r.json())
       .then((json) => {
         if (json.status === "success") setDetail(json.data)
       })
       .catch(() => {})
       .finally(() => setDetailLoading(false))
-  }, [selectedCardId, selectedDueDate])
+  }, [])
+
+  useEffect(() => {
+    if (!selectedCardId || !selectedDueDate) return
+    fetchDetail(selectedCardId, selectedDueDate)
+  }, [selectedCardId, selectedDueDate, fetchDetail])
+
+  // A new card transaction changes the cycle's amount and transaction count,
+  // and may land in the cycle currently on screen — so refresh both lists.
+  const handleTransactionAdded = async () => {
+    setTxnFormOpen(false)
+    toast({ title: "Transaction added" })
+    if (selectedCardId) {
+      await fetchCycles(selectedCardId)
+      if (selectedDueDate) await fetchDetail(selectedCardId, selectedDueDate)
+    }
+  }
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-sm font-medium">Browse a billing cycle</p>
-        <p className="text-xs text-muted-foreground">Look up any past statement for any card, not just the latest.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Browse a billing cycle</p>
+          <p className="text-xs text-muted-foreground">Look up any past statement for any card, not just the latest.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setTxnFormOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          Add transaction
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -252,6 +285,20 @@ export default function CreditCardCycleBrowser({
           )}
         </div>
       )}
+
+      {/* TransactionForm posts to the API itself — this only closes, toasts
+          and refreshes the cycle list + open cycle detail. */}
+      <Dialog open={txnFormOpen} onOpenChange={setTxnFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add transaction</DialogTitle>
+          </DialogHeader>
+          <TransactionForm
+            onSubmit={handleTransactionAdded}
+            onCancel={() => setTxnFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

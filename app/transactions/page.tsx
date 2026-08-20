@@ -29,6 +29,7 @@ import {
   investmentCategories as investmentCategoryNames,
   assetCategories as assetCategoryNames,
   creditCategories as creditCategoryNames,
+  ownerTypes,
 } from "@/lib/data"
 import { useAllCustomCategories } from "@/hooks/use-categories"
 import * as LucideIcons from "lucide-react"
@@ -189,6 +190,7 @@ function TransactionsPageContent() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [showTransactionForm, setShowTransactionForm] = useState(false)
   const [selectedCards, setSelectedCards] = useState<string[]>([])
+  const [selectedOwners, setSelectedOwners] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -337,6 +339,14 @@ function TransactionsPageContent() {
         if (id && id !== "all") params.append("card_id", id)
       })
 
+      // Owner filter — only exposed on All Transactions, same reasoning as
+      // the date range above.
+      if (activeTab === "all-transactions") {
+        selectedOwners.forEach((o) => {
+          if (o) params.append("owner_type", o)
+        })
+      }
+
       const listingUrl = apiUrl("transaction/listing", params)
       console.log(`📡 Transactions API URL: ${listingUrl}`)
 
@@ -402,7 +412,7 @@ function TransactionsPageContent() {
     const cardIds = getActiveCardIds()
 
     fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
-  }, [activeTab, selectedMonth, selectedCategories, selectedCards, dateRange])
+  }, [activeTab, selectedMonth, selectedCategories, selectedCards, selectedOwners, dateRange])
 
   const handleMonthSelect = (month: Date) => {
     setSelectedMonth(month)
@@ -831,6 +841,23 @@ function TransactionsPageContent() {
     .map((c) => c.card_name)
     .sort((a, b) => a.localeCompare(b))
 
+  // Owner options: the canonical list plus any value actually present in the
+  // loaded rows. owner_type is free text server-side (no enum), so older or
+  // externally-created rows can legitimately hold something outside the
+  // canonical set — those must stay filterable rather than be invisible.
+  const availableOwners = (() => {
+    const seen = new Set(ownerTypes.map((o) => o.toLowerCase()))
+    const extra: string[] = []
+    for (const t of transactions) {
+      const o = (t.owner_type || "").trim().toLowerCase()
+      if (o && !seen.has(o)) {
+        seen.add(o)
+        extra.push(o)
+      }
+    }
+    return [...ownerTypes, ...extra.sort((a, b) => a.localeCompare(b))]
+  })()
+
   // Get tab title
   const getTabTitle = () => {
     switch (activeTab) {
@@ -896,7 +923,7 @@ function TransactionsPageContent() {
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
             All Transactions
           </h1>
-          <MonthCalendar onMonthSelect={handleMonthSelect} defaultMonth={selectedMonth} />
+          <MonthCalendar onMonthSelect={handleMonthSelect} value={selectedMonth} />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowRecurringManage(true)}>
@@ -1006,6 +1033,10 @@ function TransactionsPageContent() {
                 selectedCards={selectedCards}
                 onCardsChange={setSelectedCards}
                 cards={creditCards}
+                showOwnerFilter={activeTab === "all-transactions"}
+                selectedOwners={selectedOwners}
+                onOwnersChange={setSelectedOwners}
+                owners={availableOwners}
                 showDateFilter={activeTab === "all-transactions"}
                 dateRange={dateRange}
                 onDateRangeChange={setDateRange}
@@ -1108,4 +1139,4 @@ export default function TransactionsPage() {
       <TransactionsPageContent />
     </LayoutWrapper>
   )
-}
+}

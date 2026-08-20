@@ -697,7 +697,7 @@ export default function Dashboard() {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Overview</h1>
-          <MonthCalendar onMonthSelect={handleMonthSelect} defaultMonth={selectedMonthDate} />
+          <MonthCalendar onMonthSelect={handleMonthSelect} value={selectedMonthDate} />
           {/* Removed duplicate month/year badge */}
           <SearchableSelect
             value={selectedOwnerType || "all"}

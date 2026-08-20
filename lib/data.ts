@@ -21,6 +21,15 @@ export const creditCards = ["Amazon ICICI", "Axis MY Zone", "HDFC Regalia", "SBI
 // hooks/use-categories.ts, which merges both.
 
 // Income categories
+/**
+ * Who a transaction belongs to. `transactions.owner_type` is a plain
+ * VARCHAR defaulting to 'self' with no DB enum behind it, so this list is
+ * the convention — kept here as the single source of truth because it was
+ * previously copy-pasted into the transaction form and the analytics filter
+ * independently, which is how they drift apart.
+ */
+export const ownerTypes = ["self", "brother", "friend", "other"]
+
 export const incomeCategories = ["Salary", "Interest", "Freelancing", "Others"]
 
 // Expense categories
