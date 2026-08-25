@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Plus, Wallet, TrendingUp, Target, PiggyBank, Receipt } from "lucide-react"
 import { format } from "date-fns"
-import { EmptyState } from "@/components/ui/states"
+import { EmptyState } from "@/components/ui/states"
+import { ToneBadge } from "@/components/ui/tone-badge"
 
 interface SavingsAccount {
   id: string
@@ -222,16 +223,13 @@ export default function SavingsTab() {
   }
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Active":
-        return <Badge className="bg-success-subtle text-success-subtle-foreground">Active</Badge>
-      case "Matured":
-        return <Badge className="bg-info-subtle text-info-subtle-foreground">Matured</Badge>
-      case "Closed":
-        return <Badge className="bg-muted text-foreground">Closed</Badge>
-      default:
-        return <Badge>{status}</Badge>
-    }
+    // Savings-domain vocabulary mapped onto the shared badge appearance.
+    const tone =
+      status === "Active" ? "success"
+      : status === "Matured" ? "info"
+      : status === "Closed" ? "neutral"
+      : "neutral"
+    return <ToneBadge tone={tone}>{status}</ToneBadge>
   }
 
   const getAccountTypeIcon = (type: string) => {

@@ -67,8 +67,11 @@ export function Panel({
   children: React.ReactNode
   className?: string
 }) {
+  // rounded-2xl to match every other container in the app. This was
+  // rounded-xl, which is why Insights and Analytics had visibly different
+  // corners from Credit Cards, Business and Lending.
   return (
-    <section className={cn("rounded-xl border bg-card shadow-sm", className)}>
+    <section className={cn("rounded-2xl border bg-card shadow-sm", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
         <div>
           <h2 className="text-sm font-semibold tracking-tight text-foreground">

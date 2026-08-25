@@ -10,6 +10,7 @@ import { ThemeToggle } from "./theme-toggle"
 import { useAuth } from "@/context/AuthContext"
 import { useCategorySync } from "@/hooks/use-categories"
 import { useCardColorSync } from "@/hooks/use-credit-cards"
+import QuickAddTransaction from "@/components/quick-add-transaction"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,6 +127,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         {/* Page content */}
         <main className="flex-1 overflow-auto p-4 lg:p-6">{children}</main>
       </div>
+
+      {/* Mounted once here rather than per-page, so Ctrl/⌘K and the floating
+          + button work on every authenticated screen. */}
+      <QuickAddTransaction enabled={isAuthenticated} />
     </div>
   )
 }

@@ -10,7 +10,8 @@ import {
   Tooltip,
 } from "recharts"
 import { cn } from "@/lib/utils"
-import type { PettyCashMonth } from "./use-overview-data"
+import type { PettyCashMonth } from "./use-overview-data"
+import { ChartTooltipCard, ChartTooltipRow } from "@/components/ui/chart-tooltip"
 
 // ─── Custom tooltip ────────────────────────────────────────────────────────────
 
@@ -18,15 +19,12 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   const val = payload[0]?.value as number
   return (
-    <div className="rounded-xl border bg-background/95 backdrop-blur-sm shadow-lg p-3 text-xs min-w-[140px]">
-      <p className="font-semibold text-foreground mb-1.5">{label}</p>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-muted-foreground">Petty Cash</span>
-        <span className="font-medium tabular-nums text-info-text">
-          ₹{val.toLocaleString("en-IN")}
-        </span>
-      </div>
-    </div>
+    <ChartTooltipCard title={label}>
+      <ChartTooltipRow
+        label="Petty Cash"
+        value={<span className="text-info-text">₹{val.toLocaleString("en-IN")}</span>}
+      />
+    </ChartTooltipCard>
   )
 }
 

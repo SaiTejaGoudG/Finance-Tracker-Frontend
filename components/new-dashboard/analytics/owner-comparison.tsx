@@ -14,7 +14,7 @@ const fmtY   = (v: number) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : v >
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border bg-background/95 shadow-lg p-3 text-xs min-w-[160px] space-y-1.5">
+    <div className="min-w-[160px] space-y-1.5 rounded-xl border bg-background/95 p-3 text-xs shadow-lg backdrop-blur-sm">
       <p className="font-semibold mb-2">{label}</p>
       {payload.map((p: any) => (
         <div key={p.name} className="flex items-center justify-between gap-3">

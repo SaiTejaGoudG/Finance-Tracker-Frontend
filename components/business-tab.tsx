@@ -99,6 +99,7 @@ import {
   creditCategories,
 } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { StatTile } from "@/components/ui/stat-tile"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -198,6 +199,9 @@ const fmtMonth = (m: string) => {
     return m
   }
 }
+/** Mirrors the old SummaryTile's inline sign handling — fmtINR is absolute. */
+const fmtSigned = (n: number) => (n < 0 ? "−" : "") + fmtINR(n)
+
 const fmtShortDate = (d: string) => {
   try {
     return format(parseISO(d), "d MMM yyyy")
@@ -461,37 +465,6 @@ function LedgerFormDialog({
 
 // ─── Summary tile ─────────────────────────────────────────────────────────────
 
-function SummaryTile({
-  label,
-  value,
-  icon: Icon,
-  tone,
-}: {
-  label: string
-  value: number
-  icon: React.ElementType
-  tone: "neutral" | "success" | "destructive"
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-success-text"
-      : tone === "destructive"
-        ? "text-destructive-text"
-        : "text-foreground"
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <p className={cn("mt-1 text-xl font-bold tabular-nums", toneClass)}>
-        {value < 0 ? "−" : ""}
-        {fmtINR(value)}
-      </p>
-    </div>
-  )
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function BusinessTab() {
@@ -745,7 +718,11 @@ export default function BusinessTab() {
           title="No categories added yet"
           description={`Edit "${selectedLedger.name}" and add at least one category to start seeing numbers here.`}
         />
-      ) : loadingSummary ? (
+      ) : loadingSummary && !summary ? (
+        // Skeleton only on FIRST load. Once there's a summary on screen,
+        // changing the date range or switching ledger keeps the old figures
+        // visible (dimmed, below) instead of collapsing the page to a grey
+        // block and then rebuilding it.
         <div className="h-64 animate-pulse rounded-2xl bg-muted" />
       ) : summary && summary.transactionCount === 0 ? (
         <EmptyState
@@ -754,15 +731,24 @@ export default function BusinessTab() {
           description="Nothing logged under these categories yet — add a transaction with a matching category and it'll show up here."
         />
       ) : summary ? (
-        <>
+        // Dimmed rather than replaced while a new range/ledger loads — the
+        // figures stay readable and the layout stays put, so the page doesn't
+        // jump. See the first-load guard above.
+        <div
+          className={cn(
+            "space-y-5 transition-opacity duration-200",
+            loadingSummary && "pointer-events-none opacity-60",
+          )}
+          aria-busy={loadingSummary}
+        >
           {/* Summary tiles */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <SummaryTile label="Total Invested" value={summary.totals.investment} icon={Wallet} tone="neutral" />
-            <SummaryTile label="Total Income" value={summary.totals.income} icon={TrendingUp} tone="success" />
-            <SummaryTile label="Total Expense" value={summary.totals.expense} icon={TrendingDown} tone="destructive" />
-            <SummaryTile
+            <StatTile label="Total Invested" value={fmtSigned(summary.totals.investment)} icon={Wallet} tone="neutral" />
+            <StatTile label="Total Income" value={fmtSigned(summary.totals.income)} icon={TrendingUp} tone="success" />
+            <StatTile label="Total Expense" value={fmtSigned(summary.totals.expense)} icon={TrendingDown} tone="destructive" />
+            <StatTile
               label="Net Profit"
-              value={summary.totals.netProfit}
+              value={fmtSigned(summary.totals.netProfit)}
               icon={PiggyBank}
               tone={summary.totals.netProfit >= 0 ? "success" : "destructive"}
             />
@@ -959,7 +945,7 @@ export default function BusinessTab() {
               </TabsContent>
             </Tabs>
           </div>
-        </>
+        </div>
       ) : null}
 
       <LedgerFormDialog

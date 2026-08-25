@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
 import { setCustomCategoryMeta, registerCategoryMeta } from "@/lib/tx-meta"
+import { cachedJson, invalidateCache } from "@/lib/request-cache"
 import {
   incomeCategories,
   expenseCategories,
@@ -141,6 +142,7 @@ export function useCategories(type: CategoryType) {
 
       if (mine?.category) {
         setCustom((prev) => [...prev, mine.category as UserCategory])
+        invalidateCache("categories/listing")
         return mine.category.name
       }
       return name
@@ -158,15 +160,14 @@ export function useAllCustomCategories() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const refetch = useCallback(async () => {
+  const refetch = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await apiClient(apiUrl("categories/listing"))
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok || json?.status === "error") {
-        throw new Error(json?.message || "Failed to load categories")
-      }
+      // Shared with useCategorySync below — both want the same full listing,
+      // and this collapses them into one request instead of two firing
+      // simultaneously from LayoutWrapper and whichever page is mounted.
+      const json = await cachedJson<any>(apiUrl("categories/listing"), { force })
       const rows: UserCategory[] = Array.isArray(json.data) ? json.data : []
       // This management view is for the user's OWN additions only — the
       // listing endpoint now also returns shared defaults (seeded
@@ -219,6 +220,9 @@ export function useAllCustomCategories() {
         .map((r) => r.category as UserCategory)
 
       setCustom((prev) => [...prev, ...createdRows])
+      // Other consumers (useCategorySync, the transaction form) read the same
+      // cached listing — drop it so they pick up the new category.
+      invalidateCache("categories/listing")
       // Reflect the emoji/color app-wide for the rest of this session
       // immediately, without waiting for the next useCategorySync fetch.
       if (createdRows[0]?.emoji || createdRows[0]?.color) {
@@ -263,6 +267,7 @@ export function useAllCustomCategories() {
 
       const updated: UserCategory = json.data
       setCustom((prev) => prev.map((c) => (c.id === id ? updated : c)))
+      invalidateCache("categories/listing")
       registerCategoryMeta(updated.name, { emoji: updated.emoji, color: updated.color })
 
       return updated
@@ -277,6 +282,7 @@ export function useAllCustomCategories() {
       throw new Error(json?.message || "Failed to delete category")
     }
     setCustom((prev) => prev.filter((c) => c.id !== id))
+    invalidateCache("categories/listing")
   }, [])
 
   return { custom, loading, error, refetch, create, update, remove }
@@ -299,9 +305,8 @@ export function useCategorySync(enabled = true) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await apiClient(apiUrl("categories/listing"))
-        const json = await res.json().catch(() => ({}))
-        if (cancelled || !res.ok || json?.status === "error") return
+        const json = await cachedJson<any>(apiUrl("categories/listing"))
+        if (cancelled) return
         const rows: UserCategory[] = Array.isArray(json.data) ? json.data : []
         const overrides: Record<string, { emoji?: string | null; color?: string | null }> = {}
         for (const row of rows) {

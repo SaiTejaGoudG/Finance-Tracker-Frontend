@@ -48,6 +48,8 @@ import { EmptyState, SkeletonRows } from "@/components/ui/states"
 import { toast } from "@/hooks/use-toast"
 import TransactionForm from "@/components/transaction-form"
 import { cn } from "@/lib/utils"
+import { StatTile } from "@/components/ui/stat-tile"
+import { MeterBar } from "@/components/ui/meter-bar"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -268,7 +270,7 @@ function AddLoanDialog({ onSaved, presetPerson }: { onSaved: () => void; presetP
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Notes (optional)</Label>
             <Textarea rows={2} placeholder="e.g. for medical emergency" value={form.notes} onChange={e => set("notes", e.target.value)} />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               Used as the ledger description too, so this is what you'll search for later.
             </p>
           </div>
@@ -370,7 +372,7 @@ function RepaymentDialog({ loan, onSaved }: { loan: Loan; onSaved: () => void })
               <Input className="pl-9" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} />
             </div>
             {principalNum > loan.outstandingAmount && (
-              <p className="text-[11px] text-destructive-text">Cannot exceed outstanding balance</p>
+              <p className="text-2xs text-destructive-text">Cannot exceed outstanding balance</p>
             )}
           </div>
 
@@ -380,7 +382,7 @@ function RepaymentDialog({ loan, onSaved }: { loan: Loan; onSaved: () => void })
               <IndianRupee className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input className="pl-9" inputMode="numeric" placeholder="0" value={interestAmount} onChange={e => setInterestAmount(e.target.value)} />
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               {loan.direction === "lent"
                 ? "Anything above the principal — recorded as Income, not part of the loan balance."
                 : "Anything above the principal — recorded as an Expense, not part of the loan balance."}
@@ -395,7 +397,7 @@ function RepaymentDialog({ loan, onSaved }: { loan: Loan; onSaved: () => void })
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Notes (optional)</Label>
             <Textarea rows={2} placeholder="e.g. paid via UPI" value={notes} onChange={e => setNotes(e.target.value)} />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               Used as the ledger description too, same as when adding a loan.
             </p>
           </div>
@@ -485,7 +487,7 @@ function EditLoanDialog({ loan, onSaved }: { loan: Loan; onSaved: () => void }) 
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Notes</Label>
             <Textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-2xs text-muted-foreground">
             Editing the note also updates the linked ledger entry's description. Principal and
             amounts can't be edited directly — record a repayment instead.
           </p>
@@ -561,32 +563,6 @@ function DeleteLoanDialog({ loan, onSaved }: { loan: Loan; onSaved: () => void }
   )
 }
 
-// ─── KPI tile ─────────────────────────────────────────────────────────────────
-
-function Kpi({
-  label, value, sub, tone, emphasis,
-}: {
-  label: string
-  value: string
-  sub?: string
-  tone?: "success" | "destructive" | "info" | "warning"
-  emphasis?: boolean
-}) {
-  const toneClass =
-    tone === "success" ? "text-success-text"
-      : tone === "destructive" ? "text-destructive-text"
-        : tone === "info" ? "text-info-text"
-          : tone === "warning" ? "text-warning-text"
-            : "text-foreground"
-  return (
-    <div className={cn("rounded-2xl border bg-card p-4 shadow-sm", emphasis && "ring-1 ring-primary/20")}>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={cn("tnum mt-1 font-bold", emphasis ? "text-2xl" : "text-xl", toneClass)}>{value}</p>
-      {sub && <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>}
-    </div>
-  )
-}
-
 // ─── One loan, inside the person detail ──────────────────────────────────────
 
 function LoanBlock({ loan, onSaved }: { loan: Loan; onSaved: () => void }) {
@@ -611,15 +587,15 @@ function LoanBlock({ loan, onSaved }: { loan: Loan; onSaved: () => void }) {
               </span>
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <Badge className={cn("border-0 px-1.5 py-0 text-[10px] font-medium", cfg.badge)}>{cfg.label}</Badge>
+              <Badge className={cn("border-0 px-1.5 py-0 text-3xs font-medium", cfg.badge)}>{cfg.label}</Badge>
               {loan.isOverdue && (
-                <Badge className="gap-0.5 border-0 bg-destructive-subtle px-1.5 py-0 text-[10px] text-destructive-subtle-foreground">
+                <Badge className="gap-0.5 border-0 bg-destructive-subtle px-1.5 py-0 text-3xs text-destructive-subtle-foreground">
                   <AlertTriangle className="h-2.5 w-2.5" /> Overdue
                 </Badge>
               )}
-              {settled && <Badge variant="outline" className="px-1.5 py-0 text-[10px]">Settled</Badge>}
+              {settled && <Badge variant="outline" className="px-1.5 py-0 text-3xs">Settled</Badge>}
               {loan.dueDate && !settled && (
-                <span className={cn("text-[11px]", loan.isOverdue ? "text-destructive-text" : "text-muted-foreground")}>
+                <span className={cn("text-2xs", loan.isOverdue ? "text-destructive-text" : "text-muted-foreground")}>
                   due {fmtDate(loan.dueDate)}
                 </span>
               )}
@@ -635,21 +611,19 @@ function LoanBlock({ loan, onSaved }: { loan: Loan; onSaved: () => void }) {
 
       {!settled && (
         <div className="mt-3 space-y-1">
-          <div className="flex items-baseline justify-between text-[11px]">
+          <div className="flex items-baseline justify-between text-2xs">
             <span className="text-muted-foreground">
               {pctPaid.toFixed(0)}% repaid
               {loan.repaymentCount > 0 && ` · ${loan.repaymentCount} payment${loan.repaymentCount > 1 ? "s" : ""}`}
             </span>
             <span className="tnum font-semibold">{fmtINR(loan.outstandingAmount)} left</span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div className={cn("h-full rounded-full", cfg.bar)} style={{ width: `${Math.min(pctPaid, 100)}%` }} />
-          </div>
+          <MeterBar value={pctPaid} fillClassName={cfg.bar} aria-label="Repayment progress" />
         </div>
       )}
 
       {loan.totalInterest > 0 && (
-        <p className="mt-2 text-[11px] text-muted-foreground">
+        <p className="mt-2 text-2xs text-muted-foreground">
           {loan.direction === "lent" ? "Interest earned" : "Interest paid"}:{" "}
           <span className={cn("tnum font-semibold", loan.direction === "lent" ? "text-success-text" : "text-warning-text")}>
             {fmtINR(loan.totalInterest)}
@@ -825,16 +799,16 @@ export default function LendingTab() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Kpi
+          <StatTile
             label="Net"
             value={`${(selectedBalance?.netPosition ?? 0) >= 0 ? "+" : "−"}${fmtINR(selectedBalance?.netPosition ?? 0)}`}
             sub={(selectedBalance?.netPosition ?? 0) >= 0 ? "In your favour" : "You're behind"}
             tone={(selectedBalance?.netPosition ?? 0) >= 0 ? "success" : "destructive"}
             emphasis
           />
-          <Kpi label="Owes you" value={fmtINR(selectedBalance?.owedToMe ?? 0)} tone="info" />
-          <Kpi label="You owe" value={fmtINR(selectedBalance?.iOwe ?? 0)} tone="warning" />
-          <Kpi label="Interest" value={fmtINR(personInterest)} sub="Across all their loans" />
+          <StatTile label="Owes you" value={fmtINR(selectedBalance?.owedToMe ?? 0)} tone="info" />
+          <StatTile label="You owe" value={fmtINR(selectedBalance?.iOwe ?? 0)} tone="warning" />
+          <StatTile label="Interest" value={fmtINR(personInterest)} sub="Across all their loans" />
         </div>
 
         {activeLoans.length > 0 && (
@@ -877,7 +851,7 @@ export default function LendingTab() {
                       <p className="text-sm font-medium">
                         {incoming ? `${selectedPerson} paid you` : `You paid ${selectedPerson}`}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">{fmtDate(r.date)}</p>
+                      <p className="text-2xs text-muted-foreground">{fmtDate(r.date)}</p>
                       {r.notes && <p className="mt-0.5 text-xs text-muted-foreground">{r.notes}</p>}
                     </div>
                     <div className="shrink-0 text-right">
@@ -885,7 +859,7 @@ export default function LendingTab() {
                         {incoming ? "+" : "−"}{fmtINR(r.amount)}
                       </p>
                       {r.interestAmount > 0 && (
-                        <p className={cn("tnum text-[11px]", incoming ? "text-success-text" : "text-warning-text")}>
+                        <p className={cn("tnum text-2xs", incoming ? "text-success-text" : "text-warning-text")}>
                           {incoming ? "+" : "−"}{fmtINR(r.interestAmount)} interest
                         </p>
                       )}
@@ -911,26 +885,26 @@ export default function LendingTab() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi
+        <StatTile
           label="Net position"
           value={`${netPosition >= 0 ? "+" : "−"}${fmtINR(netPosition)}`}
           sub={netPosition >= 0 ? "Net receivable" : "Net payable"}
           tone={netPosition >= 0 ? "success" : "destructive"}
           emphasis
         />
-        <Kpi
+        <StatTile
           label="Owed to you"
           value={fmtINR(summary?.totalOwedToMe ?? 0)}
           sub={`${summary?.outstandingLendingCount ?? 0} active`}
           tone="info"
         />
-        <Kpi
+        <StatTile
           label="You owe"
           value={fmtINR(summary?.totalIOwe ?? 0)}
           sub={`${summary?.outstandingBorrowingCount ?? 0} active`}
           tone="warning"
         />
-        <Kpi
+        <StatTile
           label="Overdue"
           value={String(summary?.overdueCount ?? 0)}
           sub="Past due date"
@@ -940,13 +914,13 @@ export default function LendingTab() {
 
       {((summary?.totalInterestEarned ?? 0) > 0 || (summary?.totalInterestPaid ?? 0) > 0) && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Kpi
+          <StatTile
             label="Interest earned"
             value={fmtINR(summary?.totalInterestEarned ?? 0)}
             sub="Extra received on money you lent — counted as Income"
             tone="success"
           />
-          <Kpi
+          <StatTile
             label="Interest paid"
             value={fmtINR(summary?.totalInterestPaid ?? 0)}
             sub="Extra you paid on money you borrowed — counted as Expense"
@@ -1016,7 +990,7 @@ export default function LendingTab() {
                             <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive-text" aria-label="Has an overdue loan" />
                           )}
                         </p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-2xs text-muted-foreground">
                           {positive ? "owes you" : "you owe"} · {p.loanCount}{" "}
                           {p.loanCount === 1 ? "loan" : "loans"}
                         </p>

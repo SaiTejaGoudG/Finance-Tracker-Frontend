@@ -20,6 +20,22 @@ const config: Config = {
       screens: {
         '3xl': '2000px', // 34"+ monitors (above 1920px FHD)
       },
+      /**
+       * Two named steps below Tailwind's `text-xs` (12px).
+       *
+       * The codebase had ~45 arbitrary `text-[10px]` and `text-[11px]`
+       * values because there was no `fontSize` scale at all — so the same
+       * semantic role (an eyebrow label, a secondary caption) was written
+       * three different ways depending on the file. These give those two
+       * sizes a name; `text-2xs`/`text-3xs` should be preferred over new
+       * arbitrary values.
+       *
+       * Only additive — every existing Tailwind size is untouched.
+       */
+      fontSize: {
+        '3xs': ['0.625rem', { lineHeight: '0.875rem' }], // 10px — eyebrow labels
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }],    // 11px — secondary captions
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

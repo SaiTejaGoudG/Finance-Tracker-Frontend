@@ -71,7 +71,18 @@ export async function apiClient(url: string, options: RequestInit = {}): Promise
 
   // Also catch explicit session-expired payloads that come back as 200
   // e.g. { "status": "error", "message": "Refresh token is required" }
-  if (res.status === 200) {
+  //
+  // Gated on a small body. This used to clone and fully JSON-parse EVERY 200
+  // response just to sniff for these strings — so a 100-row transaction list
+  // was buffered and parsed twice on every request, once here and again by
+  // the caller. A session-expired payload is a two-field object well under
+  // 512 bytes; anything larger is real data and can't be one, so it's not
+  // worth reading. (Express sets Content-Length on JSON responses; if it's
+  // missing we still check, since that's the rare case.)
+  const contentLength = Number(res.headers.get("content-length") ?? NaN)
+  const maybeSessionError = Number.isNaN(contentLength) || contentLength < 512
+
+  if (res.status === 200 && maybeSessionError) {
     const cloned = res.clone()
     try {
       const body = await cloned.json()

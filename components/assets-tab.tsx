@@ -43,14 +43,29 @@ const ASSET_TYPES: AssetType[] = [
   "Land", "Property / Flat", "Physical Gold", "Vehicle", "Equipment", "Other Asset",
 ]
 
-const TYPE_CFG: Record<AssetType, { color: string; bg: string }> = {
-  "Land":            { color: "#15803d", bg: "#f0fdf4" },
-  "Property / Flat": { color: "#0369a1", bg: "#eff6ff" },
-  "Physical Gold":   { color: "#d97706", bg: "#fffbeb" },
-  "Vehicle":         { color: "#6d28d9", bg: "#f5f3ff" },
-  "Equipment":       { color: "#475569", bg: "#f8fafc" },
-  "Other Asset":     { color: "#be185d", bg: "#fdf2f8" },
+/**
+ * Per-asset-type accent colour.
+ *
+ * The `bg` tints that used to live here were near-white literals (#f0fdf4,
+ * #eff6ff, ...) applied through an inline style, so they did NOT invert:
+ * in dark mode the icon square and type chip rendered as near-white blocks
+ * on a near-black card. The accent hue itself is a saturated mid-tone that
+ * reads fine on either background, so only the fill needed fixing —
+ * `tint()` derives it as a low-alpha wash of the accent OVER whatever the
+ * card colour is, which is the same approach the category pills already use
+ * in transactions-table.tsx.
+ */
+const TYPE_CFG: Record<AssetType, { color: string }> = {
+  "Land":            { color: "#15803d" },
+  "Property / Flat": { color: "#0369a1" },
+  "Physical Gold":   { color: "#d97706" },
+  "Vehicle":         { color: "#6d28d9" },
+  "Equipment":       { color: "#475569" },
+  "Other Asset":     { color: "#be185d" },
 }
+
+/** ~15% alpha wash of an accent colour — legible on light and dark alike. */
+const tint = (hex: string) => `${hex}26`
 
 function AssetIcon({ type }: { type: AssetType }) {
   const cls = "h-5 w-5"
@@ -230,7 +245,7 @@ function AddAssetDialog({
                 <Input className="pl-9" placeholder="Leave blank = purchase price" inputMode="numeric"
                   value={form.currentValue} onChange={e => set("currentValue", e.target.value)} />
               </div>
-              <p className="text-[11px] text-muted-foreground">Update anytime as value changes</p>
+              <p className="text-2xs text-muted-foreground">Update anytime as value changes</p>
             </div>
           </div>
 
@@ -392,7 +407,7 @@ function EditAssetDialog({
                 onChange={e => set("currentValue", e.target.value)}
               />
             </div>
-            <p className="text-[11px] text-muted-foreground">Purchase price: {fmtINR(asset.purchasePrice)}</p>
+            <p className="text-2xs text-muted-foreground">Purchase price: {fmtINR(asset.purchasePrice)}</p>
           </div>
 
           {/* Notes */}
@@ -544,7 +559,7 @@ function SellAssetDialog({
                 onChange={(e) => setSoldPrice(e.target.value)}
               />
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               Purchased for {fmtINR(asset.purchasePrice)}
               {isValid && (
                 <>
@@ -556,7 +571,7 @@ function SellAssetDialog({
               )}
             </p>
             {isValid && gain > 0 && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-2xs text-muted-foreground">
                 Only the {fmtINR(gain)} gain is booked as Income — getting your original{" "}
                 {fmtINR(asset.purchasePrice)} back isn&apos;t earnings.
               </p>
@@ -620,18 +635,18 @@ function AssetCard({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                 style={{ backgroundColor: cfg.bg }}>
+                 style={{ backgroundColor: tint(cfg.color) }}>
               <span style={{ color: cfg.color }}><AssetIcon type={asset.assetType} /></span>
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-sm leading-tight truncate">{asset.name}</p>
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                <Badge className="text-[10px] px-1.5 py-0 font-medium border-0"
-                       style={{ backgroundColor: cfg.bg, color: cfg.color }}>
+                <Badge className="text-3xs px-1.5 py-0 font-medium border-0"
+                       style={{ backgroundColor: tint(cfg.color), color: cfg.color }}>
                   {asset.assetType}
                 </Badge>
                 {asset.linkedLoanBank && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5">
+                  <Badge variant="outline" className="text-3xs px-1.5 py-0 gap-0.5">
                     <Link2 className="h-2.5 w-2.5" />
                     {asset.linkedLoanBank}
                   </Badge>
@@ -657,16 +672,16 @@ function AssetCard({
         {/* Details */}
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-muted/40 px-3 py-2">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Purchase Price</p>
+            <p className="text-3xs text-muted-foreground uppercase tracking-wide">Purchase Price</p>
             <p className="text-sm font-bold tnum mt-0.5">{fmtINR(asset.purchasePrice)}</p>
           </div>
           <div className="rounded-xl bg-muted/40 px-3 py-2">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Purchase Date</p>
+            <p className="text-3xs text-muted-foreground uppercase tracking-wide">Purchase Date</p>
             <p className="text-sm font-bold mt-0.5">{fmtDate(asset.purchaseDate)}</p>
           </div>
           {(asset.description || asset.location) && (
             <div className="rounded-xl bg-muted/40 px-3 py-2 col-span-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+              <p className="text-3xs text-muted-foreground uppercase tracking-wide">
                 {asset.description ? "Notes" : "Location"}
               </p>
               <p className="text-sm text-muted-foreground mt-0.5 truncate">

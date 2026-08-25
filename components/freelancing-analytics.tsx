@@ -376,7 +376,7 @@ export default function FreelancingAnalytics({ ownerType }: FreelancingAnalytics
                           />
                         </div>
                       </div>
-                      <span className="text-[10px] text-muted-foreground w-7 text-right shrink-0">
+                      <span className="text-3xs text-muted-foreground w-7 text-right shrink-0">
                         {pct}%
                       </span>
                     </div>

@@ -22,6 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   LayoutDashboard,
+  Coins,
   CreditCard,
   Settings,
   LogOut,
@@ -39,17 +40,39 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 
-type NavItem = { title: string; href: string; icon: React.ElementType }
+type NavItem = {
+  title: string
+  href: string
+  icon: React.ElementType
+  /** One-line clarification, shown under the title. Only where the
+   *  destination isn't obvious from the label alone. */
+  hint?: string
+}
 type NavGroup = { label: string | null; items: NavItem[] }
 
 const NAV: NavGroup[] = [
   {
     label: null,
     items: [
-      { title: "Dashboard", href: "/dashboard", icon: BarChart2 },
-      { title: "Overview", href: "/overview", icon: LayoutDashboard },
+      /**
+       * Dashboard and Overview are two different generations of the same
+       * screen and were previously indistinguishable in the nav — both just
+       * "KPIs + distribution + trend". They're kept separate deliberately,
+       * so the labels have to say what each is FOR:
+       *
+       *   Dashboard — the fast at-a-glance home. Loads its sections
+       *               independently, so it's the one to open by default.
+       *   Overview  — the deep-dive, with Loans / Savings / Goals /
+       *               Freelancing as inline tabs on one page.
+       *
+       * "Billing Cycles" was also renamed: it points at /credit-cards, and
+       * a label that doesn't match its destination is its own small bug.
+       */
+      { title: "Dashboard", href: "/dashboard", icon: BarChart2, hint: "At a glance" },
+      { title: "Overview", href: "/overview", icon: LayoutDashboard, hint: "Detailed breakdown" },
       { title: "All Transactions", href: "/transactions", icon: CreditCard },
-      { title: "Billing Cycles", href: "/credit-cards", icon: Wallet },
+      { title: "Credit Cards", href: "/credit-cards", icon: Wallet, hint: "Dues & statements" },
+      { title: "Petty Cash", href: "/petty-cash", icon: Coins, hint: "Small cash spends" },
     ],
   },
   {
@@ -117,7 +140,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
           {NAV.map((group, gi) => (
             <div key={gi} className="space-y-0.5">
               {group.label && (
-                <p className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                <p className="px-2.5 pb-1 text-2xs font-medium uppercase tracking-wider text-muted-foreground/70">
                   {group.label}
                 </p>
               )}
@@ -152,7 +175,14 @@ export function Sidebar({ className, onClose }: SidebarProps) {
                       )}
                       aria-hidden="true"
                     />
-                    {item.title}
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{item.title}</span>
+                      {item.hint && (
+                        <span className="truncate text-3xs font-normal text-muted-foreground/70">
+                          {item.hint}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 )
               })}

@@ -16,7 +16,7 @@
  *   excluded from selection and from edit/delete.
  */
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { format, parseISO } from "date-fns"
 import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -27,7 +27,6 @@ import { getCardColor } from "@/lib/card-meta"
 import { groupByDate } from "@/lib/group-transactions"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/app/transactions/page"
-import type { Transaction as ActionTransaction } from "@/components/dashboard"
 import type { Density } from "./transactions-toolbar"
 
 const isSynthetic = (id: string) => id.startsWith("emi_")
@@ -45,19 +44,6 @@ function getEffectiveTypeKey(t: Transaction): TxType {
     return t.purpose === "Investment" ? "investment" : "asset"
   }
   return t.type as TxType
-}
-
-/**
- * app/transactions defines ownerType/expenseType as `T | null`, while the
- * shared dashboard Transaction type expects `T | undefined`. Normalise at this
- * one boundary rather than widening a type that 900+ lines depend on.
- */
-function toActionTransaction(t: Transaction): ActionTransaction {
-  return {
-    ...t,
-    ownerType: t.ownerType ?? undefined,
-    expenseType: t.expenseType ?? undefined,
-  }
 }
 
 function fmtINR(n: number) {
@@ -165,23 +151,34 @@ export default function TransactionsTable({
     })
   }
 
-  // Grouping only makes sense while sorted by date; amount-sorted views stay flat
+  // Grouping only makes sense while sorted by date; amount-sorted views stay flat.
+  //
+  // Memoized: this used to re-bucket the entire list on every render, so
+  // collapsing one day or ticking one checkbox re-grouped all 100 rows even
+  // though neither changes the grouping.
   const grouped = sortBy === "date"
-  const groups = grouped
-    ? groupByDate(transactions)
-    : [
-        {
-          key: "all",
-          label: "",
-          weekday: "",
-          items: transactions,
-          net: 0,
-          inflow: 0,
-          outflow: 0,
-        },
-      ]
+  const groups = useMemo(
+    () =>
+      grouped
+        ? groupByDate(transactions)
+        : [
+            {
+              key: "all",
+              label: "",
+              weekday: "",
+              items: transactions,
+              net: 0,
+              inflow: 0,
+              outflow: 0,
+            },
+          ],
+    [transactions, grouped],
+  )
 
-  const selectableIds = transactions.filter((t) => !isSynthetic(t.id)).map((t) => t.id)
+  const selectableIds = useMemo(
+    () => transactions.filter((t) => !isSynthetic(t.id)).map((t) => t.id),
+    [transactions],
+  )
   const allSelected =
     selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))
   const someSelected = selectableIds.some((id) => selectedIds.has(id))
@@ -505,7 +502,7 @@ export default function TransactionsTable({
                   >
                     <div className="row-reveal inline-flex">
                       <TransactionActions
-                        transaction={toActionTransaction(t)}
+                        transaction={t}
                         onView={() => onView(t)}
                         onEdit={() => onEdit(t)}
                         onDelete={onDelete}

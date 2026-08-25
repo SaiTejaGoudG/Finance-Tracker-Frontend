@@ -6,7 +6,8 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
-import type { OverviewFilters } from "./use-overview-data"
+import type { OverviewFilters } from "./use-overview-data"
+import { ChartTooltipCard, ChartTooltipRow } from "@/components/ui/chart-tooltip"
 
 function fmtY(v: number) {
   if (Math.abs(v) >= 100_000) return `₹${(v / 100_000).toFixed(1)}L`
@@ -18,15 +19,16 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   const gap = payload[0]?.value as number
   return (
-    <div className="rounded-xl border bg-background/95 shadow-lg p-3 text-xs min-w-[140px]">
-      <p className="font-semibold mb-1.5">{label}</p>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-muted-foreground">Surplus</span>
-        <span className={cn("font-bold tabular-nums", gap >= 0 ? "text-success-text" : "text-destructive-text")}>
-          {gap >= 0 ? "+" : ""}₹{Math.abs(gap).toLocaleString("en-IN")}
-        </span>
-      </div>
-    </div>
+    <ChartTooltipCard title={label}>
+      <ChartTooltipRow
+        label="Surplus"
+        value={
+          <span className={cn("font-bold", gap >= 0 ? "text-success-text" : "text-destructive-text")}>
+            {gap >= 0 ? "+" : ""}₹{Math.abs(gap).toLocaleString("en-IN")}
+          </span>
+        }
+      />
+    </ChartTooltipCard>
   )
 }
 

@@ -2,7 +2,7 @@
 
 import { apiUrl } from "@/lib/api"
 import { apiClient } from "@/lib/apiClient"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { format, parseISO } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import { Plus, ReceiptText, SearchX, Trash2 } from "lucide-react"
@@ -34,6 +34,7 @@ import {
 import { useAllCustomCategories } from "@/hooks/use-categories"
 import * as LucideIcons from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 import RecurringManageModal from "@/components/recurring-manage-modal"
 import RecurringGenerateModal from "@/components/recurring-generate-modal"
 
@@ -84,38 +85,14 @@ type TransactionsListingResponse = {
   }
 }
 
-// Legacy Transaction type for compatibility
-export type Transaction = {
-  id: string
-  description: string
-  amount: number
-  type:
-    | "income"
-    | "expense"
-    | "credit"
-    | "petty-cash"
-    | "investment"
-    | "summary"
-    | "lending"
-    | "lending-repayment"
-    | "borrowing"
-    | "borrowing-repayment"
-  category: string
-  date: string
-  dueDate?: string
-  status?: "Pending" | "Paid"
-  cardName?: string
-  ownerType?: string | null
-  expenseType?: "fixed" | "variable" | null
-  purpose?: "Expense" | "Investment" | "Asset" | null
-  isSummary?: boolean
-  summaryType?: "credit" | "petty-cash" | "investment"
-  /** Bill Splitting — only your share of `amount`; null if not split. */
-  splitOwnShare?: number | null
-  /** Refunds & Cashback — a credit back to the account, not a spend. */
-  txnKind?: "purchase" | "refund" | "cashback" | null
-  refundForId?: number | null
-}
+/**
+ * Re-exported for components/transactions/transactions-table.tsx, which
+ * imports `Transaction` from this module. Canonical definition now lives in
+ * lib/transaction-types.ts, shared with components/dashboard.tsx.
+ */
+export type { Transaction } from "@/lib/transaction-types"
+import type { Transaction } from "@/lib/transaction-types"
+import { toEditTransaction } from "@/lib/transaction-types"
 
 // Map API transaction_type string → frontend TxType
 const apiTypeToTxType = (apiType: string): Transaction["type"] => {
@@ -197,6 +174,12 @@ function TransactionsPageContent() {
   const [sortBy, setSortBy] = useState<"date" | "amount">("date")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [totalAmount, setTotalAmount] = useState<number>(0)
+  // Server-side pagination. The list was hardcoded to page 1 / limit 100
+  // with no way to reach row 101 at all.
+  const PAGE_SIZE = 50
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRows, setTotalRows] = useState(0)
   // Only populated for the All Transactions tab (mixed types) — see
   // TransactionsListingResponse. null on single-type tabs, where totalAmount
   // alone is already unambiguous.
@@ -311,8 +294,8 @@ function TransactionsPageContent() {
       const params = new URLSearchParams({
         month: month.toString(),
         year: year.toString(),
-        page: "1",
-        limit: "100",
+        page: String(page),
+        limit: String(PAGE_SIZE),
         sort_column: "transaction_date",
         sort_order: "desc",
       })
@@ -369,6 +352,8 @@ function TransactionsPageContent() {
       if (data.status === "success" && data.data && data.data.status && data.data.data) {
         setTransactions(data.data.data)
         setTotalAmount(data.data.totalAmount || 0)
+        setTotalPages(data.data.pagination?.totalPages || 1)
+        setTotalRows(data.data.pagination?.total || 0)
         setTotalIncome(data.data.totalIncome ?? null)
         setTotalOutflow(data.data.totalOutflow ?? null)
         console.log(`✅ Loaded ${data.data.data.length} transactions from API`)
@@ -403,15 +388,30 @@ function TransactionsPageContent() {
     }
   }
 
-  // Fetch transactions when tab, month, year, or category changes
+  // Fetch transactions when tab, month, year, or any filter changes.
+  //
+  // Debounced, because the multi-select filters fire a state change per
+  // checkbox tick and the date-range picker fires once for `from` and again
+  // for `to` — so picking three categories used to mean three full 100-row
+  // round trips, of which only the last mattered. A short delay coalesces a
+  // burst of clicks into one request while still feeling immediate.
   useEffect(() => {
-    const transactionType = getTransactionTypeForTab(activeTab)
-    const month = selectedMonth.getMonth() + 1
-    const year = selectedMonth.getFullYear()
+    const run = () => {
+      const transactionType = getTransactionTypeForTab(activeTab)
+      const month = selectedMonth.getMonth() + 1
+      const year = selectedMonth.getFullYear()
+      const cardIds = getActiveCardIds()
+      fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
+    }
 
-    const cardIds = getActiveCardIds()
+    const timer = setTimeout(run, 250)
+    return () => clearTimeout(timer)
+  }, [activeTab, selectedMonth, selectedCategories, selectedCards, selectedOwners, dateRange, page])
 
-    fetchTransactions(transactionType, month, year, selectedCategories, cardIds)
+  // Any filter change invalidates the current page number — staying on
+  // page 4 after narrowing to 12 results would show an empty list.
+  useEffect(() => {
+    setPage(1)
   }, [activeTab, selectedMonth, selectedCategories, selectedCards, selectedOwners, dateRange])
 
   const handleMonthSelect = (month: Date) => {
@@ -574,32 +574,86 @@ function TransactionsPageContent() {
     }
   }
 
+  /**
+   * Delete, with Undo backed by a real restore endpoint.
+   *
+   * The delete goes to the server immediately — no deferred timer — so
+   * closing the tab can't leave a half-finished delete. Undo then calls
+   * POST /transaction/:id/restore, which clears deleted_at.
+   *
+   * Undo is only OFFERED when the server says the row is restorable.
+   * Deleting a Credit Card row, a lending/borrowing entry, a split bill or
+   * anything with refunds attached rewrites other tables (the billing-cycle
+   * aggregate, loan balances, refund links) and in some cases hard-deletes
+   * rows — so those can't be brought back by un-deleting the transaction
+   * alone, and the backend refuses rather than producing a plausible-looking
+   * but corrupt ledger. See transactionService.getRestoreBlockers.
+   */
+  const handleRestoreTransaction = async (id: string) => {
+    try {
+      const res = await apiClient(apiUrl(`transaction/${id}/restore`), { method: "POST" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || (json as any)?.status === "error") {
+        throw new Error((json as any)?.message || "Restore failed")
+      }
+      toast({ title: "Restored" })
+    } catch (error) {
+      toast({
+        title: "Couldn't restore",
+        description: error instanceof Error ? error.message : "Please re-enter the transaction.",
+        variant: "destructive",
+      })
+    } finally {
+      refreshTransactions()
+    }
+  }
+
   const handleDeleteTransaction = async (id: string) => {
+    // Hide the row straight away so the action feels immediate; the refresh
+    // below reconciles with the server either way.
+    setTransactions((prev) => prev.filter((t) => String(t.id) !== String(id)))
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+
     try {
       const response = await apiClient(apiUrl(`transaction/delete/${id}`), {
         method: "DELETE",
       })
+      const json = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        const json = await response.json().catch(() => ({}))
         throw new Error((json as any).message || "Delete failed")
       }
 
+      const restorable = Boolean((json as any).restorable)
+
       toast({
         title: "Transaction deleted",
-        description: "The transaction has been permanently removed.",
-        variant: "default",
+        description: restorable
+          ? undefined
+          : // Say WHY there's no undo, rather than just omitting the button.
+            (json as any).restoreBlockedReason
+            ? `This can't be undone because ${(json as any).restoreBlockedReason}.`
+            : "This one can't be undone automatically.",
+        action: restorable ? (
+          <ToastAction altText="Undo delete" onClick={() => void handleRestoreTransaction(id)}>
+            Undo
+          </ToastAction>
+        ) : undefined,
       })
-
-      // Refresh the list
-      refreshTransactions()
     } catch (error) {
       console.error("Error deleting transaction:", error)
       toast({
-        title: "Error",
+        title: "Couldn't delete",
         description: error instanceof Error ? error.message : "Failed to delete transaction.",
         variant: "destructive",
       })
+    } finally {
+      // Reconcile with the server — restores the row if the delete failed.
+      refreshTransactions()
     }
   }
 
@@ -729,25 +783,52 @@ function TransactionsPageContent() {
     }
   }
 
-  // Filter and sort transactions
-  const filteredTransactions = transactions.filter(
-    (transaction) =>
-      transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.category.toLowerCase().includes(searchTerm.toLowerCase()),
+  // Filter → sort → convert, memoized.
+  //
+  // These three passes used to run on EVERY render — including every
+  // keystroke in the search box and every unrelated state change — and the
+  // sort allocated two Date objects per comparison (~700 of them for 100
+  // rows, since a comparison sort does ~n log n comparisons). Splitting the
+  // memos means typing in the search box no longer re-sorts or re-converts
+  // rows whose order and shape haven't changed.
+  const lowerSearch = searchTerm.toLowerCase()
+
+  const filteredTransactions = useMemo(
+    () =>
+      transactions.filter(
+        (transaction) =>
+          transaction.description.toLowerCase().includes(lowerSearch) ||
+          transaction.category.toLowerCase().includes(lowerSearch),
+      ),
+    [transactions, lowerSearch],
   )
 
-  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
-    if (sortBy === "date") {
-      const dateA = new Date(a.transaction_date.split("-").reverse().join("-")).getTime()
-      const dateB = new Date(b.transaction_date.split("-").reverse().join("-")).getTime()
-      return sortOrder === "asc" ? dateA - dateB : dateB - dateA
-    } else {
-      return sortOrder === "asc" ? a.amount - b.amount : b.amount - a.amount
-    }
-  })
+  const sortedTransactions = useMemo(() => {
+    // Parse each date ONCE into a sortable number instead of inside the
+    // comparator. transaction_date arrives as dd-MM-yyyy, which doesn't
+    // sort lexically — reversing the parts gives yyyy-MM-dd, which does, so
+    // no Date object is needed at all.
+    const withKey = filteredTransactions.map((t) => ({
+      t,
+      dateKey: (t.transaction_date || "").split("-").reverse().join("-"),
+    }))
+
+    withKey.sort((a, b) => {
+      if (sortBy === "date") {
+        const cmp = a.dateKey.localeCompare(b.dateKey)
+        return sortOrder === "asc" ? cmp : -cmp
+      }
+      return sortOrder === "asc" ? a.t.amount - b.t.amount : b.t.amount - a.t.amount
+    })
+
+    return withKey.map((x) => x.t)
+  }, [filteredTransactions, sortBy, sortOrder])
 
   // Convert to legacy format for display
-  const legacyTransactions = sortedTransactions.map(convertApiTransactionToLegacy)
+  const legacyTransactions = useMemo(
+    () => sortedTransactions.map(convertApiTransactionToLegacy),
+    [sortedTransactions],
+  )
 
   // Whether the empty state should read "no matches" vs "nothing here yet"
   const hasActiveFilters =
@@ -771,7 +852,12 @@ function TransactionsPageContent() {
   // `approximate` so the toolbar can hint at it.
   const hasSearchFilter = searchTerm.trim().length > 0
 
-  const pageLocalTotals = (() => {
+  // Memoized AND skipped entirely when no search is active — this ran five
+  // array passes on every render to build a value that's thrown away unless
+  // `hasSearchFilter` is true (the backend's exact totals are used otherwise).
+  const pageLocalTotals = useMemo(() => {
+    if (!hasSearchFilter) return { inflow: 0, outflow: 0, net: 0, total: 0 }
+
     // "Inflow" here means real cash coming in, not strictly P&L income —
     // Borrowing (you received money) and Lending Repayment (getting your
     // own money back) are cash-in too, even though neither is income.
@@ -779,19 +865,16 @@ function TransactionsPageContent() {
     // transactionService.getAllTransactions.
     const isInflow = (t: Transaction) =>
       t.type === "income" || t.type === "borrowing" || t.type === "lending-repayment"
-    const inflow = legacyTransactions
-      .filter(isInflow)
-      .reduce((sum, t) => sum + t.amount, 0)
-    const outflow = legacyTransactions
-      .filter((t) => !isInflow(t))
-      .reduce((sum, t) => sum + t.amount, 0)
-    return {
-      inflow,
-      outflow,
-      net: inflow - outflow,
-      total: legacyTransactions.reduce((sum, t) => sum + t.amount, 0),
+
+    // Single pass rather than filter+reduce ×3.
+    let inflow = 0
+    let outflow = 0
+    for (const t of legacyTransactions) {
+      if (isInflow(t)) inflow += t.amount
+      else outflow += t.amount
     }
-  })()
+    return { inflow, outflow, net: inflow - outflow, total: inflow + outflow }
+  }, [legacyTransactions, hasSearchFilter])
 
   const listTotals = hasSearchFilter
     ? pageLocalTotals
@@ -845,7 +928,7 @@ function TransactionsPageContent() {
   // loaded rows. owner_type is free text server-side (no enum), so older or
   // externally-created rows can legitimately hold something outside the
   // canonical set — those must stay filterable rather than be invisible.
-  const availableOwners = (() => {
+  const availableOwners = useMemo(() => {
     const seen = new Set(ownerTypes.map((o) => o.toLowerCase()))
     const extra: string[] = []
     for (const t of transactions) {
@@ -856,7 +939,7 @@ function TransactionsPageContent() {
       }
     }
     return [...ownerTypes, ...extra.sort((a, b) => a.localeCompare(b))]
-  })()
+  }, [transactions])
 
   // Get tab title
   const getTabTitle = () => {
@@ -1061,6 +1144,7 @@ function TransactionsPageContent() {
                 onRetry={refreshTransactions}
               />
             ) : legacyTransactions.length > 0 ? (
+              <>
               <TransactionsTable
                 transactions={legacyTransactions}
                 density={density}
@@ -1077,6 +1161,42 @@ function TransactionsPageContent() {
                 onEdit={handleEditTransaction}
                 onDelete={handleDeleteTransaction}
               />
+
+              {/* Pagination. Hidden when everything already fits on one
+                  page, so the common case stays uncluttered. */}
+              {totalPages > 1 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    Showing{" "}
+                    <span className="tnum font-medium text-foreground">
+                      {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalRows)}
+                    </span>{" "}
+                    of <span className="tnum font-medium text-foreground">{totalRows}</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 1 || loading}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="tnum text-xs text-muted-foreground">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page >= totalPages || loading}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
             ) : hasActiveFilters ? (
               <EmptyState
                 icon={SearchX}
@@ -1115,7 +1235,7 @@ function TransactionsPageContent() {
           <TransactionForm
             onSubmit={handleTransactionFormSubmit}
             onCancel={handleTransactionFormCancel}
-            editTransaction={editingTransaction}
+            editTransaction={toEditTransaction(editingTransaction)}
           />
           </div>
         </DialogContent>

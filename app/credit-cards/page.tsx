@@ -44,6 +44,7 @@ import { format, parseISO, differenceInCalendarDays } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import CreditCardCycleBrowser from "@/components/credit-card-cycle-browser"
+import { MeterBar } from "@/components/ui/meter-bar"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ function CardTile({
           </div>
         </div>
         {card.due?.hasOlderPending && (
-          <Badge variant="outline" className="shrink-0 gap-1 text-[10px]">
+          <Badge variant="outline" className="shrink-0 gap-1 text-3xs">
             <AlertTriangle className="h-3 w-3" />
             Older unpaid
           </Badge>
@@ -263,7 +264,7 @@ function CardTile({
       {/* The two numbers, side by side — the whole point of this layout */}
       <div className="mt-5 grid grid-cols-2 gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Total Due</p>
+          <p className="text-2xs uppercase tracking-wider text-muted-foreground">Total Due</p>
           <p
             className={cn(
               "text-xl font-bold tnum mt-1",
@@ -282,13 +283,13 @@ function CardTile({
           {/* A bill that shrank because of a credit should say so, or it
               just looks like the statement was wrong. */}
           {card.due && (card.due.creditApplied ?? 0) > 0 && (
-            <p className="text-[11px] text-success-text mt-0.5">
+            <p className="text-2xs text-success-text mt-0.5">
               {fmtINR(card.due.creditApplied!)} credit applied
             </p>
           )}
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Recent Spends</p>
+          <p className="text-2xs uppercase tracking-wider text-muted-foreground">Recent Spends</p>
           <p
             className={cn(
               "text-xl font-bold tnum mt-1",
@@ -312,12 +313,11 @@ function CardTile({
             </span>
             <span className="font-medium tnum">{card.utilization}%</span>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("h-full rounded-full transition-all", utilizationTone(card.utilization))}
-              style={{ width: `${Math.min(100, card.utilization ?? 0)}%` }}
-            />
-          </div>
+          <MeterBar
+            value={card.utilization ?? 0}
+            fillClassName={utilizationTone(card.utilization)}
+            aria-label="Credit utilization"
+          />
         </div>
       )}
 
@@ -326,7 +326,7 @@ function CardTile({
         <div className="flex-1 min-w-0">
           {card.trend.length >= 2 && (
             <>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
+              <p className="text-2xs uppercase tracking-wider text-muted-foreground mb-1.5">
                 Last {card.trend.length} cycles
               </p>
               <Sparkline points={card.trend} />
@@ -375,7 +375,7 @@ function CycleGroup({
         <div className="flex items-center gap-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
           {badge && (
-            <Badge variant={badge.variant} className="text-[10px]">
+            <Badge variant={badge.variant} className="text-3xs">
               {badge.label}
             </Badge>
           )}
@@ -387,7 +387,7 @@ function CycleGroup({
           {/* Show the arithmetic when credits are involved, so a smaller
               statement total is obviously explained rather than suspicious. */}
           {hasCredits && (
-            <p className="text-[11px] text-muted-foreground tnum">
+            <p className="text-2xs text-muted-foreground tnum">
               {fmtINR(spends ?? 0)} spent − {fmtINR(credits ?? 0)} back
             </p>
           )}
@@ -417,7 +417,7 @@ function CycleGroup({
                         {credit && (
                           <Badge
                             variant="outline"
-                            className="shrink-0 border-success/30 text-[10px] text-success-text"
+                            className="shrink-0 border-success/30 text-3xs text-success-text"
                           >
                             {t.txnKind === "refund" ? "Refund" : "Cashback"}
                           </Badge>
@@ -634,9 +634,7 @@ export default function CreditCardsPage() {
                             {fmtINR(c.amount)} · {c.percent}%
                           </span>
                         </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-primary/60" style={{ width: `${c.percent}%` }} />
-                        </div>
+                        <MeterBar value={c.percent} fillClassName="bg-primary/60" />
                       </div>
                     ))}
                   </div>
@@ -767,15 +765,12 @@ export default function CreditCardsPage() {
                       {fmtINR(overview.totals.totalOutstanding)} of {fmtINR(overview.totals.totalLimit)}
                     </p>
                     {overview.totals.totalLimit > 0 && (
-                      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={cn(
-                            "h-full rounded-full",
-                            utilizationTone(overview.totals.overallUtilization),
-                          )}
-                          style={{ width: `${Math.min(100, overview.totals.overallUtilization ?? 0)}%` }}
-                        />
-                      </div>
+                      <MeterBar
+                        className="mt-3"
+                        value={overview.totals.overallUtilization ?? 0}
+                        fillClassName={utilizationTone(overview.totals.overallUtilization)}
+                        aria-label="Overall credit utilization"
+                      />
                     )}
                   </div>
                 </div>

@@ -47,8 +47,11 @@ export type ApiTransaction = {
   amount: number
   card_id: number | null
   card_name: string | null
-  owner_type?: string
-  expense_type?: string
+  owner_type?: string | null
+  // Two-value enum server-side (transactions.expense_type), not free text —
+  // typing it as `string` was hiding that and blocked assigning it to the
+  // shared Transaction shape.
+  expense_type?: "fixed" | "variable" | null
   payment_id?: number // Added payment_id field for credit card transactions
 }
 
@@ -87,29 +90,16 @@ export type DashboardApiResponse = {
   }
 }
 
-// Legacy Transaction type for compatibility
-export type Transaction = {
-  id: string
-  description: string
-  amount: number
-  type: "income" | "expense" | "credit" | "petty-cash" | "investment" | "summary"
-    | "lending" | "lending-repayment" | "borrowing" | "borrowing-repayment"
-  category: string
-  date: string
-  dueDate?: string
-  status?: "Pending" | "Paid"
-  cardName?: string
-  isSummary?: boolean
-  summaryType?: "credit" | "petty-cash" | "investment"
-  ownerType?: string
-  expenseType?: string
-  payment_id?: number // Added payment_id field for credit card transactions
-  /** Bill Splitting — only your share of `amount`; undefined/null if not split. */
-  splitOwnShare?: number | null
-  /** Refunds & Cashback — a credit back to the account, not a spend. */
-  txnKind?: "purchase" | "refund" | "cashback" | null
-  refundForId?: number | null
-}
+/**
+ * Re-exported so the several components importing `Transaction` from here
+ * keep working. The definition now lives in lib/transaction-types.ts — it
+ * was previously declared both here and in app/transactions/page.tsx with
+ * incompatible ownerType/expenseType types, which is what forced the
+ * boundary conversions and the suppressed build errors.
+ */
+export type { Transaction } from "@/lib/transaction-types"
+import type { Transaction } from "@/lib/transaction-types"
+import { toEditTransaction } from "@/lib/transaction-types"
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 // Derived from lib/data.ts rather than duplicated. These previously drifted:
@@ -285,6 +275,15 @@ const getStaticFallbackData = (): DashboardApiResponse["data"] => {
       { category: "Shopping", amount: 6565, percentage: 8.3 },
       { category: "Food", amount: 5768, percentage: 7.3 },
     ],
+    // These two were missing, which is why the fallback didn't satisfy
+    // DashboardApiResponse. The distribution/petty-cash panels read them
+    // unconditionally, so omitting them meant the fallback path rendered
+    // those charts against `undefined` rather than an empty series.
+    incomeDistribution: [
+      { category: "Salary", amount: 110000, percentage: 93.0 },
+      { category: "Interest", amount: 8250, percentage: 7.0 },
+    ],
+    pettyCashTrends: [],
     monthlyTrend: staticMonthlyTrend,
   }
 }
@@ -663,7 +662,15 @@ export default function Dashboard() {
     setSelectedCategory("All")
   }
 
-  if (loading) {
+  // Blank ONLY on the very first load.
+  //
+  // This used to fire on every month/owner change too, so switching month
+  // replaced the entire screen with a full-page spinner and then rebuilt it —
+  // the single biggest reason this page felt slow. The fetch already keeps
+  // the previous payload in state (see the epoch guard in fetchDashboardData),
+  // so once there's data to show we keep showing it and just dim it while the
+  // next one arrives.
+  if (loading && !dashboardData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <CenteredSpinner label="Loading dashboard…" />
@@ -693,7 +700,15 @@ export default function Dashboard() {
   const selectedMonthDate = new Date(currentYear, currentMonth - 1, 1)
 
   return (
-    <div className="space-y-6 3xl:max-w-7xl 3xl:mx-auto w-full">
+    <div
+      className={cn(
+        "space-y-6 3xl:max-w-7xl 3xl:mx-auto w-full transition-opacity duration-200",
+        // Stale-while-revalidate: prior numbers stay readable and the page
+        // keeps its layout; the dimming is what signals "these are updating".
+        loading && "pointer-events-none opacity-60",
+      )}
+      aria-busy={loading}
+    >
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Overview</h1>
@@ -990,7 +1005,7 @@ export default function Dashboard() {
           <TransactionForm
             onSubmit={handleTransactionFormSubmit}
             onCancel={handleTransactionFormCancel}
-            editTransaction={editingTransaction}
+            editTransaction={toEditTransaction(editingTransaction)}
           />
         </DialogContent>
       </Dialog>

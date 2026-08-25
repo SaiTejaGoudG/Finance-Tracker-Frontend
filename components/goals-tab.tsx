@@ -13,7 +13,8 @@ import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Target, Calendar, TrendingUp, Star, CheckCircle, Flag, Receipt } from "lucide-react"
 import { format, differenceInDays } from "date-fns"
-import { EmptyState } from "@/components/ui/states"
+import { EmptyState } from "@/components/ui/states"
+import { ToneBadge } from "@/components/ui/tone-badge"
 
 interface FinancialGoal {
   id: string
@@ -277,32 +278,25 @@ export default function GoalsTab() {
     setShowAddContribution(false)
   }
 
+  // Goal-domain vocabularies mapped onto the shared badge appearance.
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Active":
-        return <Badge className="bg-success-subtle text-success-subtle-foreground">Active</Badge>
-      case "Completed":
-        return <Badge className="bg-info-subtle text-info-subtle-foreground">Completed</Badge>
-      case "Paused":
-        return <Badge className="bg-warning-subtle text-warning-subtle-foreground">Paused</Badge>
-      case "Cancelled":
-        return <Badge className="bg-destructive-subtle text-destructive-subtle-foreground">Cancelled</Badge>
-      default:
-        return <Badge>{status}</Badge>
-    }
+    const tone =
+      status === "Active" ? "success"
+      : status === "Completed" ? "info"
+      : status === "Paused" ? "warning"
+      : status === "Cancelled" ? "destructive"
+      : "neutral"
+    return <ToneBadge tone={tone}>{status}</ToneBadge>
   }
 
   const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return <Badge className="bg-destructive-subtle text-destructive-subtle-foreground">High</Badge>
-      case "Medium":
-        return <Badge className="bg-warning-subtle text-warning-subtle-foreground">Medium</Badge>
-      case "Low":
-        return <Badge className="bg-success-subtle text-success-subtle-foreground">Low</Badge>
-      default:
-        return <Badge>{priority}</Badge>
-    }
+    const tone =
+      priority === "High" ? "destructive"
+      : priority === "Medium" ? "warning"
+      : priority === "Low" ? "success"
+      : "neutral"
+    // Priority is an attribute, not a state — no dot, so it reads as a label.
+    return <ToneBadge tone={tone} dot={false}>{priority}</ToneBadge>
   }
 
   const getCategoryIcon = (category: string) => {

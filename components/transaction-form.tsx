@@ -19,28 +19,30 @@ import { useToast } from "@/components/ui/use-toast"
 import { useCategories, type CategoryType } from "@/hooks/use-categories"
 import { ownerTypes as OWNER_TYPES } from "@/lib/data"
 
-type TxType = "income" | "expense" | "credit" | "petty-cash" | "investment" | "asset"
-type StatusType = "Pending" | "Paid"
-
-type EditTransaction = {
-  id: string
-  description: string
-  amount: number
-  type: TxType
-  category: string
-  date: string // ISO yyyy-mm-dd
-  dueDate?: string
-  status?: StatusType
-  cardName?: string
-  ownerType?: string | null
-  expenseType?: "fixed" | "variable" | null
-  purpose?: "Expense" | "Investment" | "Asset" | null
-}
+// The form can only create/edit real, single transactions — not synthetic
+// summary rows or lending/borrowing movements. Both of these now come from
+// lib/transaction-types.ts so the narrowing is enforced at every call site
+// (via toEditTransaction) rather than re-declared here and bypassed.
+import type {
+  EditableTxType as TxType,
+  TransactionStatus as StatusType,
+  EditTransaction,
+} from "@/lib/transaction-types"
 
 type Props = {
   onSubmit: (data: any) => Promise<void> | void
   onCancel: () => void
   editTransaction?: EditTransaction | null
+  /**
+   * Which type a NEW transaction starts on. Ignored when editing, since the
+   * existing row's own type wins.
+   *
+   * Added because callers that open a type-specific dialog (e.g. the income
+   * page's "Add New Income") were passing a `transactionType` prop that
+   * didn't exist — so the form silently opened on the default "expense"
+   * instead, and the mismatch was invisible with build type-checking off.
+   */
+  defaultType?: TxType
 }
 
 // API-normalized card item
@@ -81,10 +83,16 @@ const EXPENSE_TYPES: Array<"fixed" | "variable"> = ["fixed", "variable"]
 // so every existing flow behaves exactly as before unless explicitly changed.
 const CREDIT_PURPOSES: Array<"Expense" | "Investment" | "Asset"> = ["Expense", "Investment", "Asset"]
 
-export default function TransactionForm({ onSubmit, onCancel, editTransaction = null }: Props) {
+export default function TransactionForm({
+  onSubmit,
+  onCancel,
+  editTransaction = null,
+  defaultType,
+}: Props) {
   const { toast } = useToast()
-  // Core state
-  const [type, setType] = useState<TxType>(editTransaction?.type ?? "expense")
+  // Core state. Editing always wins over defaultType — the row's real type is
+  // not something a caller should be able to override.
+  const [type, setType] = useState<TxType>(editTransaction?.type ?? defaultType ?? "expense")
   const [description, setDescription] = useState<string>(editTransaction?.description ?? "")
   const [amount, setAmount] = useState<string>(editTransaction ? String(editTransaction.amount) : "")
   const [category, setCategory] = useState<string>(editTransaction?.category ?? "")
@@ -716,7 +724,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
           </div>
 
           {isCashback && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               Reduces this card&apos;s bill and counts as income. If the cycle has no spend yet, it carries
               forward as a credit against the next one.
             </p>
@@ -742,7 +750,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
                     }${r.transactionDate ? ` · ${r.transactionDate}` : ""}`,
                   }))}
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-2xs text-muted-foreground">
                   Optional — leave empty if the original purchase isn&apos;t tracked here.
                 </p>
               </div>
@@ -755,7 +763,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
               )}
 
               {refundExceeds && (
-                <p className="text-[11px] text-warning-text">
+                <p className="text-2xs text-warning-text">
                   This is more than the outstanding amount on that purchase. That&apos;s fine if it includes
                   shipping or compensation — just confirming it&apos;s intentional.
                 </p>
@@ -847,7 +855,7 @@ export default function TransactionForm({ onSubmit, onCancel, editTransaction = 
                 </span>
               </div>
               {splitExceedsTotal && (
-                <p className="text-[11px] text-destructive-text">
+                <p className="text-2xs text-destructive-text">
                   Split amounts add up to more than the total bill amount.
                 </p>
               )}

@@ -20,6 +20,8 @@ import { apiClient } from "@/lib/apiClient"
 import PayEmiDialog, { type PayEmiTarget } from "@/components/loans/pay-emi-dialog"
 import { apiUrl } from "@/lib/api"
 import { EmptyState, SkeletonRows } from "@/components/ui/states"
+import { StatTile } from "@/components/ui/stat-tile"
+import { ToneBadge } from "@/components/ui/tone-badge"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -231,35 +233,16 @@ const ordinal = (d: number) => `${d}${d === 1 ? "st" : d === 2 ? "nd" : d === 3 
 
 // ─── Tiny shared components ───────────────────────────────────────────────────
 
+/** Loan-domain vocabulary mapped onto the shared badge appearance. */
 function LoanStatusBadge({ status }: { status: LoanStatus }) {
-  const cls: Record<LoanStatus, string> = {
-    Active:     "bg-success-subtle text-success-subtle-foreground",
-    Closed:     "bg-info-subtle text-info-subtle-foreground",
-    Foreclosed: "bg-warning-subtle text-warning-subtle-foreground",
-  }
-  return <Badge className={`${cls[status]} font-semibold`}>{status}</Badge>
+  const tone = { Active: "success", Closed: "info", Foreclosed: "warning" } as const
+  return <ToneBadge tone={tone[status]}>{status}</ToneBadge>
 }
 
 function EmiStatusBadge({ status }: { status: EmiStatus }) {
-  const cls: Record<EmiStatus, string> = {
-    upcoming: "bg-info-subtle text-info-subtle-foreground",
-    paid:     "bg-success-subtle text-success-subtle-foreground",
-    overdue:  "bg-destructive-subtle text-destructive-subtle-foreground",
-  }
+  const tone = { upcoming: "info", paid: "success", overdue: "destructive" } as const
   const label: Record<EmiStatus, string> = { upcoming: "Upcoming", paid: "Paid", overdue: "Overdue" }
-  return <Badge className={`${cls[status]} text-xs font-medium`}>{label[status]}</Badge>
-}
-
-function KpiTile({
-  label, value, sub, valueClass = "text-foreground",
-}: { label: string; value: string; sub?: string; valueClass?: string }) {
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <p className="text-xs text-muted-foreground uppercase tracking-wider leading-none">{label}</p>
-      <p className={`text-xl font-bold tnum mt-2 ${valueClass}`}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-1 tnum">{sub}</p>}
-    </div>
-  )
+  return <ToneBadge tone={tone[status]}>{label[status]}</ToneBadge>
 }
 
 // ─── Add Loan Form ────────────────────────────────────────────────────────────
@@ -461,7 +444,7 @@ function AddLoanDialog({
               <Label className="text-xs text-muted-foreground uppercase tracking-wide">EMI Due Day of Month</Label>
               <Input placeholder="7" inputMode="numeric" max="31" min="1"
                 value={form.emiDueDay} onChange={e => set("emiDueDay", e.target.value)} />
-              <p className="text-[11px] text-muted-foreground">Day of month EMI is due (e.g. 7 = 7th)</p>
+              <p className="text-2xs text-muted-foreground">Day of month EMI is due (e.g. 7 = 7th)</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground uppercase tracking-wide">Card Color</Label>
@@ -522,23 +505,23 @@ function LoansOverview({
 
       {/* ── Top 3 summary cards ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiTile
+        <StatTile
           label="Total Outstanding"
           value={fmtINR(totalOutstanding)}
           sub={`Across ${activeCount} active loan${activeCount !== 1 ? "s" : ""}`}
-          valueClass="text-destructive-text"
+          tone="destructive"
         />
-        <KpiTile
+        <StatTile
           label="Monthly EMI Commitment"
           value={fmtINR(totalMonthlyEmi)}
           sub="Combined EMI due each month"
-          valueClass="text-warning-text"
+          tone="warning"
         />
-        <KpiTile
+        <StatTile
           label="Active Loans"
           value={String(activeCount)}
           sub="Currently being repaid"
-          valueClass="text-info-text"
+          tone="info"
         />
       </div>
 
@@ -573,7 +556,7 @@ function LoansOverview({
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                         style={{ backgroundColor: loan.accentColor + "20" }}>
+                         style={{ backgroundColor: loan.accentColor + "26" }}>
                       <Landmark className="h-5 w-5" style={{ color: loan.accentColor }} />
                     </div>
                     <div>
@@ -610,7 +593,7 @@ function LoansOverview({
                     { label: "Total Interest",  value: fmtINR(totalInterest),            color: "text-warning-text" },
                   ].map(m => (
                     <div key={m.label} className="rounded-xl bg-muted/40 px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{m.label}</p>
+                      <p className="text-3xs text-muted-foreground uppercase tracking-wide">{m.label}</p>
                       <p className={`text-sm font-bold tnum mt-0.5 ${m.color}`}>{m.value}</p>
                     </div>
                   ))}
@@ -623,7 +606,7 @@ function LoansOverview({
                     <span className="font-medium tnum">{progressPct.toFixed(1)}%</span>
                   </div>
                   <Progress value={progressPct} className="h-2" />
-                  <div className="flex justify-between text-[11px] text-muted-foreground tnum">
+                  <div className="flex justify-between text-2xs text-muted-foreground tnum">
                     <span>Paid: {fmtINR(paidAmount)}</span>
                     <span>Remaining: {fmtINR(totalPayable - paidAmount)}</span>
                   </div>
@@ -778,10 +761,10 @@ function LoanDetail({
 
       {/* ── 4 hero KPIs ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KpiTile label="Outstanding Principal" value={fmtINR(outstanding)}                    sub={`${remainingMonths} months left`}     valueClass="text-destructive-text" />
-        <KpiTile label="Amount Paid"            value={fmtINR(paidAmount)}                    sub={`${loan.paidEmis} of ${loan.tenureMonths} EMIs`} />
-        <KpiTile label="Next EMI"               value={nextEmi ? fmtINR(nextEmi.emiAmount) : "—"} sub={nextEmi ? fmtDate(nextEmi.dueDate) : "All paid"} valueClass="text-info-text" />
-        <KpiTile label="Remaining Payable"      value={fmtINR(remainingAmount)}               sub="Including future interest"           valueClass="text-warning-text" />
+        <StatTile label="Outstanding Principal" value={fmtINR(outstanding)}                    sub={`${remainingMonths} months left`}     tone="destructive" />
+        <StatTile label="Amount Paid"            value={fmtINR(paidAmount)}                    sub={`${loan.paidEmis} of ${loan.tenureMonths} EMIs`} />
+        <StatTile label="Next EMI"               value={nextEmi ? fmtINR(nextEmi.emiAmount) : "—"} sub={nextEmi ? fmtDate(nextEmi.dueDate) : "All paid"} tone="info" />
+        <StatTile label="Remaining Payable"      value={fmtINR(remainingAmount)}               sub="Including future interest"           tone="warning" />
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────────────── */}
@@ -857,7 +840,7 @@ function LoanDetail({
                   <div key={m.label} className="flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full shrink-0 ${m.dot}`} />
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase">{m.label}</p>
+                      <p className="text-3xs text-muted-foreground uppercase">{m.label}</p>
                       <p className="text-sm font-bold tnum">{m.value}</p>
                     </div>
                   </div>
@@ -1141,7 +1124,7 @@ function LoanDetail({
                         { label: "Remaining Tenure", before: `${remainingMonths} months`, after: `${impact.newTenure} months`, changed: prepayMode === "reduce_tenure" },
                       ].map(m => (
                         <div key={m.label} className="rounded-xl border p-3">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">{m.label}</p>
+                          <p className="text-3xs text-muted-foreground uppercase tracking-wide mb-2">{m.label}</p>
                           <p className="text-xs text-muted-foreground line-through tnum">{m.before}</p>
                           <p className={`text-base font-bold tnum ${m.changed ? "text-success-text" : ""}`}>{m.after}</p>
                         </div>

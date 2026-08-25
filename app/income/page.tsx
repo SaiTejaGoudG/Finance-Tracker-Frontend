@@ -9,6 +9,7 @@ import TransactionForm from "@/components/transaction-form"
 import TransactionViewDialog from "@/components/transaction-view-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Transaction } from "@/components/dashboard"
+import { toEditTransaction } from "@/lib/transaction-types"
 
 // Sample income data
 const sampleIncomeTransactions: Transaction[] = [
@@ -158,15 +159,18 @@ export default function IncomePage() {
       </div>
 
       {/* Transaction List */}
+      {/*
+        These were previously passed as onView/onEdit/onDelete/onMakePayment/
+        onRevokePayment/onCategoryFilter/selectedCategory — none of which
+        TransactionList declares. React silently dropped them, so view and
+        edit did nothing when clicked. Only the two callbacks the component
+        actually supports are wired here; delete/payment/category-filter
+        aren't features of this list.
+      */}
       <TransactionList
         transactions={transactions}
-        onDelete={handleDeleteTransaction}
-        onEdit={handleEditTransaction}
-        onView={handleViewTransaction}
-        onMakePayment={handleMakePayment}
-        onRevokePayment={handleRevokePayment}
-        onCategoryFilter={setSelectedCategory}
-        selectedCategory={selectedCategory}
+        onViewTransaction={handleViewTransaction}
+        onEditTransaction={handleEditTransaction}
       />
 
       {/* Transaction Form Dialog */}
@@ -178,8 +182,8 @@ export default function IncomePage() {
           <TransactionForm
             onSubmit={handleTransactionSubmit}
             onCancel={() => setShowTransactionForm(false)}
-            editTransaction={editingTransaction}
-            transactionType="income"
+            editTransaction={toEditTransaction(editingTransaction)}
+            defaultType="income"
           />
         </DialogContent>
       </Dialog>

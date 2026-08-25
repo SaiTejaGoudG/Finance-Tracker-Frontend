@@ -23,6 +23,7 @@ import { SkeletonRows, EmptyState } from "@/components/ui/states"
 import { ColorPickerButton } from "@/components/ui/color-picker-button"
 import { CATEGORY_COLOR_CHOICES } from "@/lib/tx-meta"
 import { registerCardColor } from "@/lib/card-meta"
+import { invalidateCreditCards } from "@/hooks/use-credit-cards"
 import { cn } from "@/lib/utils"
 
 /**
@@ -255,6 +256,10 @@ function ConfigurationsPageContent() {
         })
         setShowAddCard(false)
 
+        // Other consumers (transaction form, recurring modal, the
+        // app-wide colour sync) read the shared cached card list —
+        // drop it so they don't keep serving the pre-write version.
+        invalidateCreditCards()
         await fetchCreditCards()
 
         toast({
@@ -338,6 +343,10 @@ function ConfigurationsPageContent() {
         })
         setShowAddCard(false)
 
+        // Other consumers (transaction form, recurring modal, the
+        // app-wide colour sync) read the shared cached card list —
+        // drop it so they don't keep serving the pre-write version.
+        invalidateCreditCards()
         await fetchCreditCards()
 
         toast({
@@ -368,6 +377,10 @@ function ConfigurationsPageContent() {
       const result = await response.json()
 
       if (result.status) {
+        // Other consumers (transaction form, recurring modal, the
+        // app-wide colour sync) read the shared cached card list —
+        // drop it so they don't keep serving the pre-write version.
+        invalidateCreditCards()
         await fetchCreditCards()
 
         toast({

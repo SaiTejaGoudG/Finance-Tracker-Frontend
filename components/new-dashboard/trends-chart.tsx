@@ -11,27 +11,24 @@ import {
   Legend,
 } from "recharts"
 import { cn } from "@/lib/utils"
-import type { TrendMonth } from "./use-overview-data"
+import type { TrendMonth } from "./use-overview-data"
+import { ChartTooltipCard, ChartTooltipRow } from "@/components/ui/chart-tooltip"
 
 // ─── Custom tooltip ────────────────────────────────────────────────────────────
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border bg-background/95 backdrop-blur-sm shadow-lg p-3 text-xs space-y-1.5 min-w-[160px]">
-      <p className="font-semibold text-foreground mb-2">{label}</p>
+    <ChartTooltipCard title={label}>
       {payload.map((p: any) => (
-        <div key={p.name} className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-            {p.name}
-          </span>
-          <span className="font-medium tabular-nums">
-            ₹{(p.value as number).toLocaleString("en-IN")}
-          </span>
-        </div>
+        <ChartTooltipRow
+          key={p.name}
+          label={p.name}
+          color={p.color}
+          value={`₹${(p.value as number).toLocaleString("en-IN")}`}
+        />
       ))}
-    </div>
+    </ChartTooltipCard>
   )
 }
 

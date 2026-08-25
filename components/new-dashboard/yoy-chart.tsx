@@ -5,7 +5,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/apiClient"
 import { apiUrl } from "@/lib/api"
-import type { OverviewFilters } from "./use-overview-data"
+import type { OverviewFilters } from "./use-overview-data"
+import { ChartTooltipCard, ChartTooltipRow } from "@/components/ui/chart-tooltip"
 
 function fmtY(v: number) {
   if (v >= 100_000) return `₹${(v / 100_000).toFixed(1)}L`
@@ -16,18 +17,16 @@ function fmtY(v: number) {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border bg-background/95 shadow-lg p-3 text-xs space-y-1.5 min-w-[180px]">
-      <p className="font-semibold mb-2">{label}</p>
+    <ChartTooltipCard title={label}>
       {payload.map((p: any) => (
-        <div key={p.name} className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: p.fill }} />
-            {p.name}
-          </span>
-          <span className="font-medium tabular-nums">₹{(p.value as number).toLocaleString("en-IN")}</span>
-        </div>
+        <ChartTooltipRow
+          key={p.name}
+          label={p.name}
+          color={p.fill}
+          value={`₹${(p.value as number).toLocaleString("en-IN")}`}
+        />
       ))}
-    </div>
+    </ChartTooltipCard>
   )
 }
 

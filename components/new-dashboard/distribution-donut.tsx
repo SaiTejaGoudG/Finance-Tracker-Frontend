@@ -153,7 +153,7 @@ export default function DistributionDonut({ expDist, incDist, loading, className
             </ResponsiveContainer>
             {/* Center label overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[10px] text-muted-foreground">Total {typeLabel}</span>
+              <span className="text-3xs text-muted-foreground">Total {typeLabel}</span>
               <span className="text-sm font-bold tabular-nums">
                 ₹{total >= 100_000
                   ? `${(total / 100_000).toFixed(1)}L`

@@ -42,7 +42,7 @@ function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   const total = payload.reduce((s: number, p: any) => s + (p.value as number), 0)
   return (
-    <div className="rounded-xl border bg-background/95 backdrop-blur-sm shadow-lg p-3 text-xs min-w-[160px] space-y-1.5">
+    <div className="min-w-[160px] space-y-1.5 rounded-xl border bg-background/95 p-3 text-xs shadow-lg backdrop-blur-sm">
       <p className="font-semibold text-foreground mb-2">{label}</p>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center justify-between gap-4">
