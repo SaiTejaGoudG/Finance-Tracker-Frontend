@@ -11,7 +11,8 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select"
 import { Switch } from "@/components/ui/switch"
-import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee, Users, Plus, X, Undo2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { CalendarIcon, CreditCard, Tag, User, Layers, IndianRupee, Users, Plus, X, Undo2, Divide, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { getCategoryMeta } from "@/lib/tx-meta"
@@ -122,6 +123,15 @@ export default function TransactionForm({
   const [splitParticipants, setSplitParticipants] = useState<{ name: string; amount: string }[]>([
     { name: "", amount: "" },
   ])
+  // Whether an equal split counts the payer as one of the people. On: a ₹900
+  // bill with 2 others is ₹300 each. Off: the other two take ₹450 each and
+  // the payer keeps nothing — money fronted for someone else.
+  const [splitIncludeMe, setSplitIncludeMe] = useState(true)
+
+  // In flight. Guards against a second submit creating a duplicate
+  // transaction — the request takes long enough on a cold Render dyno that a
+  // double-click is easy, and the form stays open until the parent closes it.
+  const [submitting, setSubmitting] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)
   const [dueDateOpen, setDueDateOpen] = useState(false)
   const [date, setDate] = useState<Date>(editTransaction?.date ? new Date(editTransaction.date) : new Date())
@@ -339,6 +349,28 @@ export default function TransactionForm({
   const updateSplitParticipant = (index: number, field: "name" | "amount", value: string) => {
     setSplitParticipants((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
   }
+  /**
+   * Divide the bill evenly and fill in every participant's amount.
+   *
+   * Rounded to whole rupees, with the remainder left to the payer rather than
+   * spread across participants: ₹1,000 three ways gives each other person
+   * ₹333 and leaves ₹334 as your share. Shares must add up to the total
+   * exactly — `split_own_share` is derived as total − participants server-side,
+   * so any rounding slack silently lands on you anyway. Doing it deliberately
+   * keeps the displayed numbers honest.
+   *
+   * Applies to every row, named or not, so you can split first and name people
+   * after.
+   */
+  const splitEqually = () => {
+    const total = Number(amount || 0)
+    const people = splitParticipants.length + (splitIncludeMe ? 1 : 0)
+    if (!(total > 0) || people < 1) return
+
+    const each = Math.floor(total / people)
+    setSplitParticipants((prev) => prev.map((p) => ({ ...p, amount: String(each) })))
+  }
+
   const addSplitParticipant = () => setSplitParticipants((prev) => [...prev, { name: "", amount: "" }])
   const removeSplitParticipant = (index: number) =>
     setSplitParticipants((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev))
@@ -365,79 +397,107 @@ export default function TransactionForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Belt and braces: the button is disabled below, but Enter in a text
+    // field submits too and doesn't go through the button.
+    if (submitting) return
+    setSubmitting(true)
 
-    // Build request
-    const body: any = {
-      transaction_type: toApiType(type),
-      description,
-      category,
-      transaction_date: format(date, "yyyy-MM-dd"),
-      due_date: null,
-      status: type === "credit" ? "Pending" : type === "petty-cash" ? "Paid" : status,
-      amount: Number(amount || 0),
-      user_id: "d9d3c6f2-0a1b-4b2d-9ec2-937a1db43f31",
-      owner_type: ownerType,
-      expense_type: computeExpenseType(),
-    }
+    // Declared outside the try so the catch below can say "create" vs "save".
+    const isUpdate = !!editTransaction?.id
+    // The whole handler is inside the try, body-building included. With the
+    // try starting at the fetch, a throw while building the payload (an
+    // invalid date reaching format(), say) skipped the catch entirely and
+    // left `submitting` stuck true — a permanently dead button with no error
+    // shown and no way back except reloading the page.
+    try {
 
-    const getDueDate = () => {
-      if (type === "income" || type === "investment" || type === "petty-cash" || type === "asset") {
+      // Build request
+      const body: any = {
+        transaction_type: toApiType(type),
+        description,
+        category,
+        transaction_date: format(date, "yyyy-MM-dd"),
+        due_date: null,
+        status: type === "credit" ? "Pending" : type === "petty-cash" ? "Paid" : status,
+        amount: Number(amount || 0),
+        user_id: "d9d3c6f2-0a1b-4b2d-9ec2-937a1db43f31",
+        owner_type: ownerType,
+        expense_type: computeExpenseType(),
+      }
+
+      const getDueDate = () => {
+        if (type === "income" || type === "investment" || type === "petty-cash" || type === "asset") {
+          return null
+        }
+        if (type === "expense" && dueDate) {
+          return format(dueDate, "yyyy-MM-dd")
+        }
         return null
       }
-      if (type === "expense" && dueDate) {
-        return format(dueDate, "yyyy-MM-dd")
+
+      body.due_date = getDueDate()
+
+      if (showCardSelect) {
+        const id = selectedCardId ? Number(selectedCardId) : null
+        const name = (id ? cards.find((c) => c.id === id)?.card_name : selectedCardName) || selectedCardName || null
+        body.card_id = id
+        body.card_name = name
+        body.purpose = purpose
       }
-      return null
-    }
 
-    body.due_date = getDueDate()
-
-    if (showCardSelect) {
-      const id = selectedCardId ? Number(selectedCardId) : null
-      const name = (id ? cards.find((c) => c.id === id)?.card_name : selectedCardName) || selectedCardName || null
-      body.card_id = id
-      body.card_name = name
-      body.purpose = purpose
-    }
-
-    // Refunds & Cashback. Amount always goes up positive — the backend
-    // derives the sign from txn_kind, so nothing downstream has to guess.
-    body.txn_kind = showKindField ? txnKind : "purchase"
-    if (isRefund) {
-      body.refund_for_id = refundForId ? Number(refundForId) : null
-      body.refund_beneficiary_id = refundBeneficiaryId ? Number(refundBeneficiaryId) : null
-    }
-
-    if (showSplitField && splitEnabled && splitParticipantsValid.length > 0 && !splitExceedsTotal) {
-      body.split = {
-        participants: splitParticipantsValid.map((p) => ({
-          person_name: p.name.trim(),
-          amount: Number(p.amount),
-        })),
+      // Refunds & Cashback. Amount always goes up positive — the backend
+      // derives the sign from txn_kind, so nothing downstream has to guess.
+      body.txn_kind = showKindField ? txnKind : "purchase"
+      if (isRefund) {
+        body.refund_for_id = refundForId ? Number(refundForId) : null
+        body.refund_beneficiary_id = refundBeneficiaryId ? Number(refundBeneficiaryId) : null
       }
+
+      if (showSplitField && splitEnabled && splitParticipantsValid.length > 0 && !splitExceedsTotal) {
+        body.split = {
+          participants: splitParticipantsValid.map((p) => ({
+            person_name: p.name.trim(),
+            amount: Number(p.amount),
+          })),
+        }
+      }
+
+      if (isUpdate) body.id = Number.parseInt(editTransaction!.id)
+
+      const url = isUpdate
+        ? apiUrl("transaction/update")
+        : apiUrl("transaction/store")
+
+      const res = await apiClient(url, {
+        method: isUpdate ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      const json = await res.json().catch(() => ({} as any))
+
+      // This used to log the error and call onSubmit() anyway "to keep UX
+      // responsive" — so a failed save closed the form and showed a success
+      // toast. The transaction was gone and nothing said so. A failure has to
+      // stop here, leave the form open with the data intact, and re-enable
+      // the button so it can be retried.
+      if (!res.ok || json?.status === "error") {
+        throw new Error(json?.message || `Couldn't ${isUpdate ? "update" : "create"} the transaction.`)
+      }
+
+      await onSubmit(body)
+      // Deliberately not re-enabling on success: the parent closes or resets
+      // the form, and flipping the button back first lets a fast second click
+      // through.
+    } catch (err) {
+      console.error("Transaction save failed:", err)
+      toast({
+        title: isUpdate ? "Couldn't save changes" : "Couldn't create transaction",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      })
+      setSubmitting(false)
     }
-
-    // Choose endpoint based on edit
-    const isUpdate = !!editTransaction?.id
-    if (isUpdate) body.id = Number.parseInt(editTransaction!.id)
-
-    const url = isUpdate
-      ? apiUrl("transaction/update")
-      : apiUrl("transaction/store")
-
-    const res = await apiClient(url, {
-      method: isUpdate ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}))
-      console.error("API error:", errorData)
-      // Still allow parent to close/refresh to keep UX responsive
-    }
-
-    await onSubmit(body)
   }
 
   // Compact, responsive two-column layout
@@ -844,9 +904,57 @@ export default function TransactionForm({
                 </div>
               ))}
 
-              <Button type="button" variant="outline" size="sm" onClick={addSplitParticipant} className="gap-1.5">
-                <Plus className="h-3.5 w-3.5" /> Add person
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={addSplitParticipant} className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> Add person
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={splitEqually}
+                  // Nothing to divide without an amount, so the button would
+                  // silently do nothing — say why instead.
+                  disabled={!(Number(amount || 0) > 0)}
+                  title={
+                    Number(amount || 0) > 0
+                      ? `Divide ₹${Number(amount).toLocaleString("en-IN")} between ${
+                          splitParticipants.length + (splitIncludeMe ? 1 : 0)
+                        } people`
+                      : "Enter the transaction amount first"
+                  }
+                  className="gap-1.5"
+                >
+                  <Divide className="h-3.5 w-3.5" /> Split equally
+                </Button>
+
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                  <Checkbox
+                    checked={splitIncludeMe}
+                    onCheckedChange={(v) => setSplitIncludeMe(v === true)}
+                  />
+                  Include me
+                </label>
+              </div>
+
+              {/* What an equal split would produce, before committing to it —
+                  the arithmetic is the whole point of the button, so showing
+                  it removes the need to tap and check. */}
+              {Number(amount || 0) > 0 && (
+                <p className="text-2xs text-muted-foreground">
+                  Equally:{" "}
+                  <span className="font-medium text-foreground">
+                    ₹
+                    {Math.floor(
+                      Number(amount) / (splitParticipants.length + (splitIncludeMe ? 1 : 0)),
+                    ).toLocaleString("en-IN")}
+                  </span>{" "}
+                  each across {splitParticipants.length + (splitIncludeMe ? 1 : 0)}{" "}
+                  {splitParticipants.length + (splitIncludeMe ? 1 : 0) === 1 ? "person" : "people"}
+                  {splitIncludeMe ? " (you included)" : " (not counting you)"}
+                </p>
+              )}
 
               <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Your share</span>
@@ -866,15 +974,27 @@ export default function TransactionForm({
 
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        {/* Cancel is disabled too: closing mid-flight would unmount the form
+            while the request is still running, so the result would land
+            nowhere and the list wouldn't refresh. */}
+        <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
         <Button
           type="submit"
-          disabled={showSplitField && splitEnabled && splitExceedsTotal}
+          disabled={submitting || (showSplitField && splitEnabled && splitExceedsTotal)}
           className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          {editTransaction ? "Save Changes" : "Create"}
+          {submitting ? (
+            <>
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              {editTransaction ? "Saving…" : "Creating…"}
+            </>
+          ) : editTransaction ? (
+            "Save Changes"
+          ) : (
+            "Create"
+          )}
         </Button>
       </div>
     </form>

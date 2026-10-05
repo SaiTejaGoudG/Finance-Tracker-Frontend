@@ -9,6 +9,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import StatusBadge from "@/components/status-badge"
+import { ToneBadge } from "@/components/ui/tone-badge"
+import { cardCycleAmount } from "@/lib/transaction-types"
 import { EmptyState } from "@/components/ui/states"
 import TransactionActions from "@/components/transaction-actions"
 import { ArrowDownIcon, ArrowUpIcon, Search, ReceiptText } from "lucide-react"
@@ -117,7 +119,9 @@ export default function TransactionTabs(props: Props) {
   // Credit card summary strip — only when a specific card is selected
   const creditCardSummary = React.useMemo(() => {
     if (activeTab !== "credit-cards" || !selectedCard) return null
-    const total = sorted.reduce((sum, t) => sum + t.amount, 0)
+    // Signed: a refund on the cycle reduces the bill. Summing raw amounts
+    // ADDED it, so a ₹4,623 bill with a ₹596 refund displayed as ₹5,815.
+    const total = sorted.reduce((sum, t) => sum + cardCycleAmount(t), 0)
     const dueDate = sorted.find((t) => t.dueDate)?.dueDate ?? null
     return { total, dueDate, cardName: selectedCard }
   }, [activeTab, selectedCard, sorted])
@@ -327,7 +331,23 @@ export default function TransactionTabs(props: Props) {
                               {emoji}
                             </span>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{transaction.description}</p>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <p className="text-sm font-medium truncate">{transaction.description}</p>
+                                {/* Money coming BACK reads as a spend otherwise — the row
+                                    sits in a list of outflows and the amount is signed, not
+                                    coloured. The badge says so in words, so it survives
+                                    greyscale and colour-blindness. */}
+                                {transaction.txnKind === "refund" && (
+                                  <ToneBadge tone="success" dot={false} className="flex-shrink-0">
+                                    Refund
+                                  </ToneBadge>
+                                )}
+                                {transaction.txnKind === "cashback" && (
+                                  <ToneBadge tone="success" dot={false} className="flex-shrink-0">
+                                    Cashback
+                                  </ToneBadge>
+                                )}
+                              </div>
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <p className="text-xs text-muted-foreground truncate">{transaction.category}</p>
                                 {/* Card name badge — shown in All Transactions for credit-type rows */}

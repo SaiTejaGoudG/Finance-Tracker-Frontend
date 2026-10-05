@@ -53,6 +53,10 @@ export type ApiTransaction = {
   // shared Transaction shape.
   expense_type?: "fixed" | "variable" | null
   payment_id?: number // Added payment_id field for credit card transactions
+  // Refunds & cashback. The server sends these because effectiveAmount()
+  // needs them to sign the amount; the UI uses txn_kind to flag the row.
+  txn_kind?: "purchase" | "refund" | "cashback" | null
+  split_own_share?: number | null
 }
 
 export type CreditCardData = {
@@ -157,6 +161,8 @@ const convertApiTransactionToLegacy = (
     ownerType: apiTransaction.owner_type,
     expenseType: apiTransaction.expense_type,
     payment_id: apiTransaction.payment_id, // Added payment_id field for credit card transactions
+    txnKind: apiTransaction.txn_kind ?? "purchase",
+    splitOwnShare: apiTransaction.split_own_share ?? null,
   }
 }
 

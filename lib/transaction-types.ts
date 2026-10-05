@@ -158,3 +158,21 @@ export function toEditTransaction(
     purpose: t.purpose ?? null,
   }
 }
+
+/**
+ * The signed amount a row contributes to its credit card BILLING CYCLE total.
+ *
+ * Mirrors cardCycleAmount() in the backend's transactionClassification.js, and
+ * is a different question from "what did this cost me":
+ *
+ *   - A refund or cashback SUBTRACTS — the card really was credited.
+ *   - A split bill contributes its FULL amount, not just your share, because
+ *     the bank charged the whole thing regardless of who owes you back.
+ *
+ * A cycle can legitimately total a negative number (cashback posted before any
+ * spend), so callers must not clamp it to zero.
+ */
+export function cardCycleAmount(t: Pick<Transaction, "amount" | "txnKind">): number {
+  const amount = Number(t.amount) || 0
+  return t.txnKind === "refund" || t.txnKind === "cashback" ? -amount : amount
+}
